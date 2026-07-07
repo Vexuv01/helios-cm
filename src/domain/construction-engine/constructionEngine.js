@@ -5,6 +5,7 @@ import {
   calculateForecast,
   calculateHealth,
   calculateProgress,
+  calculateTimeline,
   calculateWeeklyProduction,
 } from "../construction-intelligence";
 
@@ -12,6 +13,12 @@ export function runConstructionEngine({ project = null, activities = [] } = {}) 
   const progress = calculateProgress(activities);
   const disciplineProgress = calculateDisciplineProgress(progress.activities);
   const criticalActivities = calculateCriticalActivities(progress.activities);
+
+  const timeline = calculateTimeline({
+    project,
+    activities,
+    progress,
+  });
 
   const health = calculateHealth({
     progress,
@@ -25,6 +32,7 @@ export function runConstructionEngine({ project = null, activities = [] } = {}) 
     project,
     progress,
     health,
+    timeline,
   });
 
   const decisionFeed = buildDecisionFeed({
@@ -48,9 +56,11 @@ export function runConstructionEngine({ project = null, activities = [] } = {}) 
 
     criticalActivities,
 
+    timeline,
+
     healthScore: health.score,
     healthStatus: health.status,
-    delayRisk: health.delayRisk,
+    delayRisk: timeline.milestoneRisk ?? health.delayRisk,
     healthReasons: health.reasons,
 
     weeklyProduction,

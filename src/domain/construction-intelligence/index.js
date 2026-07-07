@@ -5,3 +5,4 @@ export * from "./weekly.engine";
 export * from "./health.engine";
 export * from "./forecast.engine";
 export * from "./decision.engine";
+export { calculateTimeline } from "./timeline.engine";
