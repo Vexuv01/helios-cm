@@ -3,6 +3,78 @@
   gap: 22px;
 }
 
+.wbs-control-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 22px;
+  align-items: stretch;
+  padding: 24px;
+  border-radius: 30px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background:
+    radial-gradient(circle at top left, rgba(34, 197, 94, 0.12), transparent 34%),
+    rgba(2, 6, 23, 0.5);
+  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.24);
+}
+
+.wbs-control-header h2 {
+  margin: 6px 0 8px;
+  font-size: clamp(34px, 5vw, 58px);
+  line-height: 0.95;
+  letter-spacing: -0.07em;
+}
+
+.wbs-control-header p {
+  max-width: 760px;
+  margin: 0;
+  color: #94a3b8;
+  font-weight: 750;
+}
+
+.wbs-eyebrow {
+  display: block;
+  color: #94a3b8;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.11em;
+  font-weight: 950;
+}
+
+.wbs-header-actions {
+  min-width: 260px;
+  display: grid;
+  gap: 10px;
+  align-content: center;
+}
+
+.wbs-header-actions button,
+.wbs-row-actions button,
+.wbs-add-inline,
+.wbs-secondary {
+  border: 0;
+  border-radius: 14px;
+  padding: 11px 14px;
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.wbs-header-actions button:first-child {
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.wbs-secondary,
+.wbs-row-actions button,
+.wbs-add-inline {
+  background: rgba(148, 163, 184, 0.14);
+  color: #f8fafc;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .wbs-error {
   padding: 14px 16px;
   border-radius: 16px;
@@ -19,9 +91,8 @@
 }
 
 .wbs-kpi-grid article,
-.wbs-form,
-.wbs-discipline-panel,
-.wbs-table-panel {
+.wbs-enterprise-table,
+.wbs-discipline-strip button {
   border: 1px solid rgba(148, 163, 184, 0.18);
   border-radius: 24px;
   background: rgba(2, 6, 23, 0.42);
@@ -33,13 +104,9 @@
 }
 
 .wbs-kpi-grid span,
-.wbs-form label,
-.discipline-row span {
-  color: #94a3b8;
-}
-
-.wbs-kpi-grid span {
+.wbs-discipline-strip span {
   display: block;
+  color: #94a3b8;
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.1em;
@@ -53,106 +120,179 @@
   letter-spacing: -0.04em;
 }
 
-.wbs-kpi-grid small {
+.wbs-kpi-grid small,
+.wbs-discipline-strip small {
   color: #64748b;
-  font-weight: 700;
+  font-weight: 800;
 }
 
-.wbs-editor-grid {
+.wbs-discipline-strip {
   display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(280px, 0.8fr);
-  gap: 18px;
-  align-items: start;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
 }
 
-.wbs-form,
-.wbs-discipline-panel,
-.wbs-table-panel {
+.wbs-discipline-strip button {
+  text-align: left;
+  padding: 16px;
+  color: #f8fafc;
+}
+
+.wbs-discipline-strip button.active {
+  border-color: rgba(34, 197, 94, 0.45);
+  background: rgba(22, 163, 74, 0.08);
+}
+
+.wbs-discipline-strip strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 24px;
+  letter-spacing: -0.05em;
+}
+
+.wbs-enterprise-table {
   padding: 20px;
+  border-radius: 30px;
 }
 
-.wbs-panel-heading {
+.wbs-table-toolbar {
   display: flex;
   justify-content: space-between;
   gap: 16px;
-  align-items: flex-start;
   margin-bottom: 18px;
 }
 
-.wbs-panel-heading h3 {
+.wbs-table-toolbar h3 {
   margin: 0;
-  font-size: 22px;
-  letter-spacing: -0.04em;
+  font-size: 24px;
+  letter-spacing: -0.05em;
 }
 
-.wbs-panel-heading p {
-  margin: 7px 0 0;
+.wbs-table-toolbar p {
+  margin: 6px 0 0;
   color: #94a3b8;
+  font-weight: 750;
 }
 
-.wbs-form-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+.wbs-group {
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 22px;
+  overflow: hidden;
+  margin-bottom: 14px;
+  background: rgba(15, 23, 42, 0.38);
 }
 
-.wbs-form label {
-  display: grid;
-  gap: 8px;
-  font-size: 12px;
+.wbs-group-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border: 0;
+  background: rgba(15, 23, 42, 0.88);
+  color: #f8fafc;
+  text-align: left;
+  cursor: pointer;
+}
+
+.wbs-group-header strong {
+  font-size: 18px;
+}
+
+.wbs-group-header small {
+  margin-left: auto;
+  color: #94a3b8;
+  font-weight: 850;
+}
+
+.wbs-table-wrap {
+  overflow-x: auto;
+  padding: 12px;
+}
+
+.wbs-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  min-width: 1450px;
+}
+
+.wbs-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  text-align: left;
+  color: #94a3b8;
+  font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  font-weight: 900;
+  background: rgba(2, 6, 23, 0.96);
 }
 
-.wbs-form input,
-.wbs-form select {
+.wbs-table th,
+.wbs-table td {
+  padding: 10px 8px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+  vertical-align: middle;
+}
+
+.wbs-table td {
+  color: #e2e8f0;
+}
+
+.wbs-table input,
+.wbs-table select {
   width: 100%;
-  border: 1px solid rgba(148, 163, 184, 0.24);
-  border-radius: 14px;
-  padding: 12px 13px;
-  background: rgba(15, 23, 42, 0.92);
+  min-width: 90px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  padding: 10px 11px;
+  background: rgba(15, 23, 42, 0.72);
   color: #f8fafc;
   outline: none;
   font: inherit;
+  font-size: 13px;
 }
 
-.wbs-form input:focus,
-.wbs-form select:focus {
+.wbs-table input:focus,
+.wbs-table select:focus {
   border-color: rgba(147, 197, 253, 0.8);
   box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.12);
 }
 
-.wbs-actions {
+.wbs-activity-name input {
+  min-width: 280px;
+}
+
+.wbs-progress-cell {
+  min-width: 110px;
+}
+
+.wbs-progress-cell strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+}
+
+.wbs-progress-cell div {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.16);
+  overflow: hidden;
+}
+
+.wbs-progress-cell span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #38bdf8, #22c55e);
+}
+
+.wbs-row-actions {
   display: flex;
-  gap: 10px;
-  margin-top: 18px;
-}
-
-.wbs-actions button,
-.wbs-secondary,
-.wbs-row-actions button {
-  border: 0;
-  border-radius: 14px;
-  padding: 11px 14px;
-  font-weight: 900;
-  cursor: pointer;
-}
-
-.wbs-actions button {
-  background: #f8fafc;
-  color: #0f172a;
-}
-
-.wbs-actions button:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-.wbs-secondary,
-.wbs-row-actions button {
-  background: rgba(148, 163, 184, 0.14);
-  color: #f8fafc;
+  gap: 8px;
+  justify-content: flex-end;
+  min-width: 150px;
 }
 
 .wbs-row-actions button.danger {
@@ -160,109 +300,47 @@
   color: #fecaca;
 }
 
-.discipline-list {
-  display: grid;
-  gap: 10px;
+.wbs-add-inline {
+  margin: 14px 0 4px;
 }
 
-.discipline-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 14px;
-  align-items: center;
-  padding: 13px;
-  border-radius: 16px;
+.wbs-empty,
+.wbs-empty-state {
+  color: #94a3b8;
+  margin: 0;
+  font-weight: 800;
+}
+
+.wbs-empty-state {
+  display: grid;
+  gap: 8px;
+  padding: 30px;
+  border-radius: 22px;
   background: rgba(15, 23, 42, 0.7);
   border: 1px solid rgba(148, 163, 184, 0.14);
 }
 
-.discipline-row strong,
-.discipline-row span {
-  display: block;
-}
-
-.discipline-row b {
+.wbs-empty-state strong {
+  color: #f8fafc;
   font-size: 18px;
 }
 
-.wbs-table-wrap {
-  overflow-x: auto;
-}
-
-.wbs-table {
-  width: 100%;
-  border-collapse: collapse;
-  min-width: 980px;
-}
-
-.wbs-table th {
-  text-align: left;
-  color: #94a3b8;
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-.wbs-table th,
-.wbs-table td {
-  padding: 14px 12px;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
-}
-
-.wbs-table td {
-  color: #e2e8f0;
-}
-
-.wbs-date {
-  color: #94a3b8;
-  white-space: nowrap;
-}
-
-.wbs-status {
-  display: inline-flex;
-  padding: 7px 10px;
-  border-radius: 999px;
-  background: rgba(148, 163, 184, 0.13);
-  color: #e2e8f0;
-  font-size: 12px;
-  font-weight: 900;
-}
-
-.wbs-status.BASELINE,
-.wbs-status.COMPLETED {
-  background: rgba(34, 197, 94, 0.15);
-  color: #bbf7d0;
-}
-
-.wbs-status.IN_PROGRESS {
-  background: rgba(59, 130, 246, 0.16);
-  color: #bfdbfe;
-}
-
-.wbs-status.ON_HOLD {
-  background: rgba(245, 158, 11, 0.16);
-  color: #fde68a;
-}
-
-.wbs-row-actions {
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
-}
-
-.wbs-empty {
-  color: #94a3b8;
+.wbs-empty-state p {
   margin: 0;
-  font-weight: 700;
 }
 
-@media (max-width: 980px) {
+@media (max-width: 1100px) {
+  .wbs-control-header,
   .wbs-kpi-grid,
-  .wbs-editor-grid {
+  .wbs-discipline-strip {
     grid-template-columns: 1fr;
   }
 
-  .wbs-form-grid {
-    grid-template-columns: 1fr;
+  .wbs-control-header {
+    display: grid;
+  }
+
+  .wbs-header-actions {
+    min-width: 0;
   }
 }

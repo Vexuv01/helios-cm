@@ -2,24 +2,52 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useProject } from "../../features/projects/context/useProject";
 import {
   EMPTY_WBS_ACTIVITY,
+  importPvAgripvWbsTemplate,
   loadProjectWbs,
   removeWbsActivity,
   saveWbsActivity,
 } from "../../features/wbs/services/wbsService";
 import "../../styles/wbs.css";
 
-const DISCIPLINES = [
-  "ENGINEERING",
-  "PROCUREMENT",
-  "CIVIL",
-  "MECHANICAL",
-  "ELECTRICAL",
-  "COMMISSIONING",
-  "GRID_CONNECTION",
-  "GENERAL",
-];
-
 const STATUSES = ["DRAFT", "BASELINE", "IN_PROGRESS", "COMPLETED", "ON_HOLD"];
+
+const DISCIPLINE_LABELS = {
+  ENGINEERING: "Ingegneria",
+  PROCUREMENT: "Procurement",
+  CIVIL: "Opere Civili",
+  MECHANICAL: "Opere Meccaniche",
+  ELECTRICAL: "Opere Elettriche",
+  COMMISSIONING: "Collaudi e Commissioning",
+  GRID_CONNECTION: "Opere di Rete",
+  GENERAL: "General",
+};
+
+function createEmptyRow(projectId, sortOrder) {
+  return {
+    ...EMPTY_WBS_ACTIVITY,
+    projectId,
+    code: `NEW-${String(sortOrder).padStart(3, "0")}`,
+    name: "New activity",
+    sortOrder,
+  };
+}
+
+function numberValue(value) {
+  return Number(value || 0);
+}
+
+function formatNumber(value, digits = 2) {
+  return numberValue(value).toFixed(digits);
+}
+
+function calculateProgress(activity) {
+  const baseline = numberValue(activity.baselineQuantity);
+  const installed = numberValue(activity.installedQuantity);
+
+  if (baseline <= 0) return 0;
+
+  return Math.min((installed / baseline) * 100, 100);
+}
 
 export default function ProjectWbs() {
   const { currentProject, projectId } = useProject();
@@ -29,12 +57,12 @@ export default function ProjectWbs() {
     totals: { baselineQuantity: 0, weightPercent: 0 },
     disciplines: [],
   });
-  const [form, setForm] = useState(EMPTY_WBS_ACTIVITY);
+  const [draftRows, setDraftRows] = useState([]);
+  const [expanded, setExpanded] = useState({});
+  const [savingId, setSavingId] = useState("");
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [error, setError] = useState("");
-
-  const isEditing = Boolean(form.id);
 
   const refreshWbs = useCallback(async () => {
     setLoading(true);
@@ -43,6 +71,15 @@ export default function ProjectWbs() {
     try {
       const data = await loadProjectWbs(projectId);
       setWbs(data);
+      setDraftRows(data.activities);
+      setExpanded((current) => {
+        if (Object.keys(current).length > 0) return current;
+
+        return data.activities.reduce((acc, activity) => {
+          acc[activity.discipline || "GENERAL"] = true;
+          return acc;
+        }, {});
+      });
     } catch (err) {
       setError(err.message || "Unable to load WBS");
     } finally {
@@ -54,56 +91,78 @@ export default function ProjectWbs() {
     refreshWbs();
   }, [refreshWbs]);
 
-  const disciplineSummary = useMemo(() => {
-    return wbs.activities.reduce((acc, activity) => {
+  const groupedRows = useMemo(() => {
+    return draftRows.reduce((acc, activity) => {
       const key = activity.discipline || "GENERAL";
 
-      if (!acc[key]) {
-        acc[key] = {
-          discipline: key,
-          activities: 0,
-          weightPercent: 0,
-          baselineQuantity: 0,
-        };
-      }
+      if (!acc[key]) acc[key] = [];
 
-      acc[key].activities += 1;
-      acc[key].weightPercent += Number(activity.weightPercent || 0);
-      acc[key].baselineQuantity += Number(activity.baselineQuantity || 0);
-
+      acc[key].push(activity);
       return acc;
     }, {});
-  }, [wbs.activities]);
+  }, [draftRows]);
 
-  function updateForm(event) {
-    const { name, value } = event.target;
-    setForm((current) => ({ ...current, [name]: value }));
+  const disciplineSummary = useMemo(() => {
+    return Object.entries(groupedRows).map(([discipline, activities]) => {
+      const weightPercent = activities.reduce(
+        (sum, activity) => sum + numberValue(activity.weightPercent),
+        0
+      );
+      const earnedWeight = activities.reduce((sum, activity) => {
+        return sum + (calculateProgress(activity) / 100) * numberValue(activity.weightPercent);
+      }, 0);
+
+      return {
+        discipline,
+        label: DISCIPLINE_LABELS[discipline] || discipline,
+        activities: activities.length,
+        weightPercent,
+        progress: weightPercent > 0 ? (earnedWeight / weightPercent) * 100 : 0,
+      };
+    });
+  }, [groupedRows]);
+
+  const totalWeight = draftRows.reduce(
+    (sum, activity) => sum + numberValue(activity.weightPercent),
+    0
+  );
+
+  function updateRow(rowId, field, value) {
+    setDraftRows((current) =>
+      current.map((row) => (row.id === rowId ? { ...row, [field]: value } : row))
+    );
   }
 
-  function resetForm() {
-    setForm(EMPTY_WBS_ACTIVITY);
-    setError("");
-  }
-
-  function editActivity(activity) {
-    setForm(activity);
-    setError("");
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }
-
-  async function submitActivity(event) {
-    event.preventDefault();
-    setSaving(true);
+  async function saveRow(row) {
+    setSavingId(row.id || row.code);
     setError("");
 
     try {
-      await saveWbsActivity(projectId, form);
-      resetForm();
+      await saveWbsActivity(projectId, row);
       await refreshWbs();
     } catch (err) {
       setError(err.message || "Unable to save WBS activity");
     } finally {
-      setSaving(false);
+      setSavingId("");
+    }
+  }
+
+  async function addActivity(discipline = "GENERAL") {
+    const row = createEmptyRow(projectId, draftRows.length + 1);
+
+    row.discipline = discipline;
+
+    setSavingId(row.code);
+    setError("");
+
+    try {
+      await saveWbsActivity(projectId, row);
+      await refreshWbs();
+      setExpanded((current) => ({ ...current, [discipline]: true }));
+    } catch (err) {
+      setError(err.message || "Unable to add WBS activity");
+    } finally {
+      setSavingId("");
     }
   }
 
@@ -114,30 +173,70 @@ export default function ProjectWbs() {
 
     if (!confirmed) return;
 
+    setSavingId(activity.id);
     setError("");
 
     try {
       await removeWbsActivity(activity.id);
-
-      if (form.id === activity.id) {
-        resetForm();
-      }
-
       await refreshWbs();
     } catch (err) {
       setError(err.message || "Unable to delete WBS activity");
+    } finally {
+      setSavingId("");
     }
+  }
+
+  async function importTemplate() {
+    const confirmed = window.confirm(
+      "Import the standard FV/AgriPV WBS template into this project?"
+    );
+
+    if (!confirmed) return;
+
+    setImporting(true);
+    setError("");
+
+    try {
+      await importPvAgripvWbsTemplate(projectId);
+      await refreshWbs();
+    } catch (err) {
+      setError(err.message || "Unable to import WBS template");
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  function toggleDiscipline(discipline) {
+    setExpanded((current) => ({
+      ...current,
+      [discipline]: !current[discipline],
+    }));
+  }
+
+  if (loading) {
+    return <p className="wbs-empty">Loading WBS baseline...</p>;
   }
 
   return (
     <div className="wbs-page">
-      <header className="workspace-page-header">
-        <h2>WBS Baseline</h2>
-        <p>
-          Real construction work breakdown structure for {currentProject?.name}.
-          Activities saved here become the baseline for Weekly production and
-          the Construction Engine.
-        </p>
+      <header className="wbs-control-header">
+        <div>
+          <span className="wbs-eyebrow">HELIOS WBS Baseline</span>
+          <h2>{currentProject?.name}</h2>
+          <p>
+            Real editable construction baseline. Quantities, weights and planned
+            dates feed Weekly production, Snapshot, Forecast and Control Room.
+          </p>
+        </div>
+
+        <div className="wbs-header-actions">
+          <button type="button" onClick={importTemplate} disabled={importing || draftRows.length > 0}>
+            {importing ? "Importing..." : "Import FV/AgriPV Template"}
+          </button>
+          <button type="button" className="wbs-secondary" onClick={() => addActivity("GENERAL")}>
+            + Add Activity
+          </button>
+        </div>
       </header>
 
       {error ? <div className="wbs-error">{error}</div> : null}
@@ -145,271 +244,201 @@ export default function ProjectWbs() {
       <section className="wbs-kpi-grid">
         <article>
           <span>Activities</span>
-          <strong>{wbs.activities.length}</strong>
-          <small>Supabase records</small>
+          <strong>{draftRows.length}</strong>
+          <small>Editable WBS records</small>
         </article>
         <article>
           <span>Disciplines</span>
-          <strong>{Object.keys(disciplineSummary).length}</strong>
+          <strong>{disciplineSummary.length}</strong>
           <small>Construction areas</small>
         </article>
         <article>
           <span>Total Weight</span>
-          <strong>{Number(wbs.totals.weightPercent || 0).toFixed(2)}%</strong>
-          <small>Target should be 100%</small>
+          <strong>{formatNumber(totalWeight)}%</strong>
+          <small>Target baseline = 100%</small>
         </article>
         <article>
           <span>Baseline Qty</span>
-          <strong>{Number(wbs.totals.baselineQuantity || 0).toFixed(2)}</strong>
-          <small>Total quantities</small>
+          <strong>{formatNumber(wbs.totals.baselineQuantity)}</strong>
+          <small>Total planned quantities</small>
         </article>
       </section>
 
-      <section className="wbs-editor-grid">
-        <form className="wbs-form" onSubmit={submitActivity}>
-          <div className="wbs-panel-heading">
-            <div>
-              <h3>{isEditing ? "Edit Activity" : "New WBS Activity"}</h3>
-              <p>
-                Define construction activities by code, discipline, quantity and
-                weight.
-              </p>
-            </div>
-
-            {isEditing ? (
-              <button type="button" className="wbs-secondary" onClick={resetForm}>
-                New
-              </button>
-            ) : null}
-          </div>
-
-          <div className="wbs-form-grid">
-            <label>
-              Code
-              <input
-                name="code"
-                value={form.code}
-                onChange={updateForm}
-                placeholder="CIV-001"
-                required
-              />
-            </label>
-
-            <label>
-              Activity name
-              <input
-                name="name"
-                value={form.name}
-                onChange={updateForm}
-                placeholder="Fence installation"
-                required
-              />
-            </label>
-
-            <label>
-              Discipline
-              <select
-                name="discipline"
-                value={form.discipline}
-                onChange={updateForm}
-              >
-                {DISCIPLINES.map((discipline) => (
-                  <option key={discipline} value={discipline}>
-                    {discipline}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label>
-              Unit
-              <input
-                name="unit"
-                value={form.unit}
-                onChange={updateForm}
-                placeholder="ml, nr, MW, m²"
-                required
-              />
-            </label>
-
-            <label>
-              Baseline quantity
-              <input
-                name="baselineQuantity"
-                type="number"
-                step="0.01"
-                value={form.baselineQuantity}
-                onChange={updateForm}
-              />
-            </label>
-
-            <label>
-              Weight %
-              <input
-                name="weightPercent"
-                type="number"
-                step="0.01"
-                value={form.weightPercent}
-                onChange={updateForm}
-              />
-            </label>
-
-            <label>
-              Planned start
-              <input
-                name="plannedStart"
-                type="date"
-                value={form.plannedStart}
-                onChange={updateForm}
-              />
-            </label>
-
-            <label>
-              Planned finish
-              <input
-                name="plannedFinish"
-                type="date"
-                value={form.plannedFinish}
-                onChange={updateForm}
-              />
-            </label>
-
-            <label>
-              Status
-              <select name="status" value={form.status} onChange={updateForm}>
-                {STATUSES.map((status) => (
-                  <option key={status} value={status}>
-                    {status}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label>
-              Sort order
-              <input
-                name="sortOrder"
-                type="number"
-                value={form.sortOrder}
-                onChange={updateForm}
-              />
-            </label>
-          </div>
-
-          <div className="wbs-actions">
-            <button type="submit" disabled={saving}>
-              {saving
-                ? "Saving..."
-                : isEditing
-                  ? "Update Activity"
-                  : "Create Activity"}
-            </button>
-            <button type="button" className="wbs-secondary" onClick={resetForm}>
-              Reset
-            </button>
-          </div>
-        </form>
-
-        <aside className="wbs-discipline-panel">
-          <div className="wbs-panel-heading">
-            <div>
-              <h3>Discipline Summary</h3>
-              <p>Live totals calculated from WBS records.</p>
-            </div>
-          </div>
-
-          <div className="discipline-list">
-            {Object.values(disciplineSummary).length === 0 ? (
-              <p className="wbs-empty">No disciplines yet.</p>
-            ) : (
-              Object.values(disciplineSummary).map((item) => (
-                <div key={item.discipline} className="discipline-row">
-                  <div>
-                    <strong>{item.discipline}</strong>
-                    <span>{item.activities} activities</span>
-                  </div>
-                  <b>{Number(item.weightPercent || 0).toFixed(2)}%</b>
-                </div>
-              ))
-            )}
-          </div>
-        </aside>
+      <section className="wbs-discipline-strip">
+        {disciplineSummary.map((item) => (
+          <button
+            key={item.discipline}
+            type="button"
+            onClick={() => toggleDiscipline(item.discipline)}
+            className={expanded[item.discipline] ? "active" : ""}
+          >
+            <span>{item.label}</span>
+            <strong>{formatNumber(item.progress, 1)}%</strong>
+            <small>{formatNumber(item.weightPercent)}% weight · {item.activities} rows</small>
+          </button>
+        ))}
       </section>
 
-      <section className="wbs-table-panel">
-        <div className="wbs-panel-heading">
+      <section className="wbs-enterprise-table">
+        <div className="wbs-table-toolbar">
           <div>
-            <h3>Activities</h3>
-            <p>
-              This is the real WBS list stored in Supabase for the selected
-              project.
-            </p>
+            <h3>Construction WBS</h3>
+            <p>Edit directly inside the table. Save each row after changing quantities, dates or weights.</p>
           </div>
         </div>
 
-        {loading ? (
-          <p className="wbs-empty">Loading WBS...</p>
-        ) : wbs.activities.length === 0 ? (
-          <p className="wbs-empty">
-            No WBS activities yet. Create the first activity above.
-          </p>
-        ) : (
-          <div className="wbs-table-wrap">
-            <table className="wbs-table">
-              <thead>
-                <tr>
-                  <th>Code</th>
-                  <th>Activity</th>
-                  <th>Discipline</th>
-                  <th>Unit</th>
-                  <th>Baseline</th>
-                  <th>Weight</th>
-                  <th>Planned</th>
-                  <th>Status</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {wbs.activities.map((activity) => (
-                  <tr key={activity.id}>
-                    <td>
-                      <strong>{activity.code}</strong>
-                    </td>
-                    <td>{activity.name}</td>
-                    <td>{activity.discipline}</td>
-                    <td>{activity.unit}</td>
-                    <td>{Number(activity.baselineQuantity || 0).toFixed(2)}</td>
-                    <td>{Number(activity.weightPercent || 0).toFixed(2)}%</td>
-                    <td>
-                      <span className="wbs-date">
-                        {activity.plannedStart || "—"} →{" "}
-                        {activity.plannedFinish || "—"}
-                      </span>
-                    </td>
-                    <td>
-                      <span className={`wbs-status ${activity.status}`}>
-                        {activity.status}
-                      </span>
-                    </td>
-                    <td>
-                      <div className="wbs-row-actions">
-                        <button type="button" onClick={() => editActivity(activity)}>
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          className="danger"
-                          onClick={() => deleteActivity(activity)}
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        {draftRows.length === 0 ? (
+          <div className="wbs-empty-state">
+            <strong>No WBS activities yet.</strong>
+            <p>Import the FV/AgriPV template or create the first activity manually.</p>
           </div>
+        ) : (
+          Object.entries(groupedRows).map(([discipline, activities]) => (
+            <div key={discipline} className="wbs-group">
+              <button
+                type="button"
+                className="wbs-group-header"
+                onClick={() => toggleDiscipline(discipline)}
+              >
+                <span>{expanded[discipline] ? "▾" : "▸"}</span>
+                <strong>{DISCIPLINE_LABELS[discipline] || discipline}</strong>
+                <small>{activities.length} activities</small>
+              </button>
+
+              {expanded[discipline] ? (
+                <div className="wbs-table-wrap">
+                  <table className="wbs-table">
+                    <thead>
+                      <tr>
+                        <th>Code</th>
+                        <th>Activity</th>
+                        <th>Unit</th>
+                        <th>Baseline Qty</th>
+                        <th>Installed Qty</th>
+                        <th>Weight</th>
+                        <th>Progress</th>
+                        <th>Planned Start</th>
+                        <th>Planned Finish</th>
+                        <th>Status</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+
+                    <tbody>
+                      {activities.map((activity) => {
+                        const progress = calculateProgress(activity);
+                        const rowSaving = savingId === activity.id || savingId === activity.code;
+
+                        return (
+                          <tr key={activity.id}>
+                            <td>
+                              <input
+                                value={activity.code}
+                                onChange={(event) => updateRow(activity.id, "code", event.target.value)}
+                              />
+                            </td>
+                            <td className="wbs-activity-name">
+                              <input
+                                value={activity.name}
+                                onChange={(event) => updateRow(activity.id, "name", event.target.value)}
+                              />
+                            </td>
+                            <td>
+                              <input
+                                value={activity.unit}
+                                onChange={(event) => updateRow(activity.id, "unit", event.target.value)}
+                              />
+                            </td>
+                            <td>
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={activity.baselineQuantity}
+                                onChange={(event) => updateRow(activity.id, "baselineQuantity", event.target.value)}
+                              />
+                            </td>
+                            <td>
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={activity.installedQuantity}
+                                onChange={(event) => updateRow(activity.id, "installedQuantity", event.target.value)}
+                              />
+                            </td>
+                            <td>
+                              <input
+                                type="number"
+                                step="0.001"
+                                value={activity.weightPercent}
+                                onChange={(event) => updateRow(activity.id, "weightPercent", event.target.value)}
+                              />
+                            </td>
+                            <td>
+                              <div className="wbs-progress-cell">
+                                <strong>{formatNumber(progress, 1)}%</strong>
+                                <div>
+                                  <span style={{ width: `${progress}%` }} />
+                                </div>
+                              </div>
+                            </td>
+                            <td>
+                              <input
+                                type="date"
+                                value={activity.plannedStart || ""}
+                                onChange={(event) => updateRow(activity.id, "plannedStart", event.target.value)}
+                              />
+                            </td>
+                            <td>
+                              <input
+                                type="date"
+                                value={activity.plannedFinish || ""}
+                                onChange={(event) => updateRow(activity.id, "plannedFinish", event.target.value)}
+                              />
+                            </td>
+                            <td>
+                              <select
+                                value={activity.status}
+                                onChange={(event) => updateRow(activity.id, "status", event.target.value)}
+                              >
+                                {STATUSES.map((status) => (
+                                  <option key={status} value={status}>
+                                    {status}
+                                  </option>
+                                ))}
+                              </select>
+                            </td>
+                            <td>
+                              <div className="wbs-row-actions">
+                                <button type="button" onClick={() => saveRow(activity)} disabled={rowSaving}>
+                                  {rowSaving ? "Saving" : "Save"}
+                                </button>
+                                <button
+                                  type="button"
+                                  className="danger"
+                                  onClick={() => deleteActivity(activity)}
+                                  disabled={rowSaving}
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+
+                  <button
+                    type="button"
+                    className="wbs-add-inline"
+                    onClick={() => addActivity(discipline)}
+                  >
+                    + Add activity to {DISCIPLINE_LABELS[discipline] || discipline}
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          ))
         )}
       </section>
     </div>
