@@ -22,6 +22,40 @@ function riskLabel(value) {
   return "On Track";
 }
 
+function riskClass(value) {
+  return String(value || "LOW").toLowerCase();
+}
+
+function activityLabel(activity) {
+  return activity?.code ? `${activity.code} · ${activity.name}` : activity?.name;
+}
+
+function ActivityList({ items = [], empty, mode = "standard" }) {
+  if (!items.length) {
+    return <p className="dashboard-empty">{empty}</p>;
+  }
+
+  return (
+    <div className="activity-list">
+      {items.slice(0, 8).map((activity) => (
+        <div key={activity.id} className={`activity-row ${mode}`}>
+          <div>
+            <strong>{activityLabel(activity)}</strong>
+            <span>{activity.discipline || "General"}</span>
+          </div>
+
+          <div className="activity-meta">
+            {activity.delayDays > 0 && <b>{activity.delayDays}d delay</b>}
+            {activity.plannedStart && <small>Start {formatDate(activity.plannedStart)}</small>}
+            {activity.plannedFinish && <small>Finish {formatDate(activity.plannedFinish)}</small>}
+            <em>{formatPercent(activity.progress)}</em>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function ProjectDashboard() {
   const { currentProject, projectId } = useProject();
 
@@ -61,6 +95,7 @@ export default function ProjectDashboard() {
     const progress = Number(snapshot.progress.overallProgress || 0);
     const earnedWeight = Number(snapshot.progress.earnedWeight || 0);
     const remainingWeight = Number(snapshot.forecast.remainingWeight || 100 - earnedWeight);
+    const timeline = snapshot.timeline || {};
 
     return {
       progress,
@@ -68,13 +103,14 @@ export default function ProjectDashboard() {
       remainingWeight: Math.max(0, remainingWeight),
       healthScore: Number(snapshot.health.score || 0),
       healthStatus: snapshot.health.status || "WATCH",
-      delayRisk: snapshot.health.delayRisk || "LOW",
-      forecastCOD: snapshot.forecast.forecastCOD,
-      plannedCOD: snapshot.forecast.plannedCOD,
-      varianceDays: Number(snapshot.forecast.varianceDays || 0),
+      delayRisk: timeline.milestoneRisk || snapshot.health.delayRisk || "LOW",
+      forecastCOD: timeline.forecastCOD || snapshot.forecast.forecastCOD,
+      plannedCOD: snapshot.forecast.plannedCOD || timeline.plannedFinish,
+      varianceDays: Number(snapshot.forecast.varianceDays || timeline.delayDays || 0),
       confidence: Number(snapshot.forecast.confidence || 0),
       weeklyVelocity: Number(snapshot.forecast.weeklyVelocity || 0),
       recoveryIndex: Number(snapshot.forecast.recoveryIndex || 0),
+      timeline,
     };
   }, [snapshot]);
 
@@ -97,12 +133,12 @@ export default function ProjectDashboard() {
           <span className="eyebrow">HELIOS Construction Control Room</span>
           <h2>{currentProject?.name || snapshot.project?.name}</h2>
           <p>
-            Single source of truth generated from Supabase, WBS baseline,
+            Operational construction view generated from Supabase, WBS baseline,
             weekly production and the Construction Intelligence Engine.
           </p>
         </div>
 
-        <div className={`control-room-status ${controlRoom.delayRisk.toLowerCase()}`}>
+        <div className={`control-room-status ${riskClass(controlRoom.delayRisk)}`}>
           <span>{riskLabel(controlRoom.delayRisk)}</span>
           <strong>{controlRoom.healthStatus}</strong>
         </div>
@@ -126,7 +162,7 @@ export default function ProjectDashboard() {
         <div className="hero-health">
           <span>Health Score</span>
           <strong>{controlRoom.healthScore}</strong>
-          <small>Delay Risk: {controlRoom.delayRisk}</small>
+          <small>Milestone Risk: {controlRoom.delayRisk}</small>
         </div>
 
         <div className="hero-forecast">
@@ -146,25 +182,89 @@ export default function ProjectDashboard() {
         </article>
 
         <article>
-          <span>Forecast Variance</span>
-          <strong>{controlRoom.varianceDays}d</strong>
-          <small>Current estimated schedule variance</small>
+          <span>Timeline Delay</span>
+          <strong>{controlRoom.timeline.delayDays || 0}d</strong>
+          <small>Calculated from planned finish vs actual status</small>
         </article>
 
         <article>
-          <span>Weekly Velocity</span>
-          <strong>{controlRoom.weeklyVelocity.toFixed(2)}%</strong>
-          <small>Base productivity indicator</small>
+          <span>Upcoming Activities</span>
+          <strong>{controlRoom.timeline.upcomingActivities?.length || 0}</strong>
+          <small>Starting in the next 21 days</small>
         </article>
 
         <article>
-          <span>Recovery Index</span>
-          <strong>{controlRoom.recoveryIndex}</strong>
-          <small>Ability to recover schedule risk</small>
+          <span>Look Ahead</span>
+          <strong>{controlRoom.timeline.lookAhead?.length || 0}</strong>
+          <small>Activities due in the next 28 days</small>
         </article>
       </section>
 
+      <section className="timeline-panel">
+        <div className="panel-title">
+          <div>
+            <span className="eyebrow">Schedule Intelligence</span>
+            <h3>Construction Timeline</h3>
+          </div>
+          <strong className={`timeline-risk ${riskClass(controlRoom.delayRisk)}`}>
+            {controlRoom.delayRisk}
+          </strong>
+        </div>
+
+        <div className="timeline-strip">
+          <div>
+            <span>Planned Start</span>
+            <strong>{formatDate(controlRoom.timeline.plannedStart)}</strong>
+          </div>
+          <div>
+            <span>Actual Start</span>
+            <strong>{formatDate(controlRoom.timeline.actualStart)}</strong>
+          </div>
+          <div>
+            <span>Today</span>
+            <strong>{formatDate(controlRoom.timeline.today)}</strong>
+          </div>
+          <div>
+            <span>Planned Finish</span>
+            <strong>{formatDate(controlRoom.timeline.plannedFinish)}</strong>
+          </div>
+          <div>
+            <span>Forecast COD</span>
+            <strong>{formatDate(controlRoom.timeline.forecastCOD)}</strong>
+          </div>
+        </div>
+      </section>
+
       <section className="control-room-grid">
+        <article className="dashboard-panel danger">
+          <div className="panel-title">
+            <div>
+              <span className="eyebrow">Action Required</span>
+              <h3>Overdue Activities</h3>
+            </div>
+          </div>
+
+          <ActivityList
+            items={controlRoom.timeline.overdueActivities}
+            empty="No overdue activities detected."
+            mode="overdue"
+          />
+        </article>
+
+        <article className="dashboard-panel">
+          <div className="panel-title">
+            <div>
+              <span className="eyebrow">Next 21 Days</span>
+              <h3>Upcoming Activities</h3>
+            </div>
+          </div>
+
+          <ActivityList
+            items={controlRoom.timeline.upcomingActivities}
+            empty="No upcoming activities in the next 21 days."
+          />
+        </article>
+
         <article className="dashboard-panel large">
           <div className="panel-title">
             <div>
@@ -202,6 +302,20 @@ export default function ProjectDashboard() {
         <article className="dashboard-panel">
           <div className="panel-title">
             <div>
+              <span className="eyebrow">Look Ahead</span>
+              <h3>Next 28 Days</h3>
+            </div>
+          </div>
+
+          <ActivityList
+            items={controlRoom.timeline.lookAhead}
+            empty="No activities due in the next 28 days."
+          />
+        </article>
+
+        <article className="dashboard-panel">
+          <div className="panel-title">
+            <div>
               <span className="eyebrow">Today</span>
               <h3>Decision Feed</h3>
             </div>
@@ -219,50 +333,6 @@ export default function ProjectDashboard() {
               </div>
             ))}
           </div>
-        </article>
-
-        <article className="dashboard-panel">
-          <div className="panel-title">
-            <div>
-              <span className="eyebrow">Risk</span>
-              <h3>Health Reasons</h3>
-            </div>
-          </div>
-
-          <div className="health-reasons">
-            {snapshot.health.reasons.map((reason, index) => (
-              <div key={`${reason}-${index}`} className="health-reason">
-                {reason}
-              </div>
-            ))}
-          </div>
-        </article>
-
-        <article className="dashboard-panel">
-          <div className="panel-title">
-            <div>
-              <span className="eyebrow">Execution</span>
-              <h3>Critical Activities</h3>
-            </div>
-          </div>
-
-          {snapshot.criticalActivities.length === 0 ? (
-            <p className="dashboard-empty">
-              No critical activities detected by the Construction Engine.
-            </p>
-          ) : (
-            <div className="critical-list">
-              {snapshot.criticalActivities.map((activity) => (
-                <div key={activity.id} className="critical-row">
-                  <div>
-                    <strong>{activity.code}</strong>
-                    <span>{activity.name}</span>
-                  </div>
-                  <b>{formatPercent(activity.progress)}</b>
-                </div>
-              ))}
-            </div>
-          )}
         </article>
       </section>
     </div>
