@@ -1,33 +1,35 @@
 import { useEffect, useState } from "react";
 import { useProject } from "../../features/projects/context/useProject";
-import { loadProjectDashboard } from "../../features/dashboard/services/projectDashboardService";
+import { getConstructionSnapshot } from "../../services/constructionSnapshot.service";
 import "../../styles/dashboard.css";
 
 export default function ProjectDashboard() {
   const { currentProject, projectId } = useProject();
 
-  const [dashboard, setDashboard] = useState(null);
+  const [snapshot, setSnapshot] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
     let active = true;
 
-    async function loadDashboard() {
+    async function loadSnapshot() {
+      if (!projectId) return;
+
       setLoading(true);
       setError("");
 
       try {
-        const data = await loadProjectDashboard(projectId);
-        if (active) setDashboard(data);
+        const data = await getConstructionSnapshot(projectId);
+        if (active) setSnapshot(data);
       } catch (err) {
-        if (active) setError(err.message || "Unable to load dashboard");
+        if (active) setError(err.message || "Unable to load construction snapshot");
       } finally {
         if (active) setLoading(false);
       }
     }
 
-    loadDashboard();
+    loadSnapshot();
 
     return () => {
       active = false;
@@ -42,17 +44,21 @@ export default function ProjectDashboard() {
     return <div className="dashboard-error">{error}</div>;
   }
 
-  const progress = Number(dashboard?.totals.progress || 0);
-  const earnedWeight = Number(dashboard?.totals.earnedWeight || 0);
-  const remainingWeight = Number(dashboard?.totals.remainingWeight || 0);
+  if (!snapshot) {
+    return <p className="dashboard-empty">No construction snapshot available.</p>;
+  }
+
+  const progress = Number(snapshot.progress.overallProgress || 0);
+  const earnedWeight = Number(snapshot.progress.earnedWeight || 0);
+  const remainingWeight = Math.max(0, 100 - earnedWeight);
 
   return (
     <div className="dashboard-page">
       <header className="workspace-page-header">
         <h2>Construction Control Room</h2>
         <p>
-          Real-time project overview for {currentProject?.name}, calculated from
-          WBS baseline and installed quantities.
+          Real-time project overview for {currentProject?.name}, generated from
+          the Construction Snapshot Engine.
         </p>
       </header>
 
@@ -65,33 +71,36 @@ export default function ProjectDashboard() {
           </div>
         </div>
 
-        <div className={`dashboard-health ${dashboard.health.status}`}>
+        <div className={`dashboard-health ${snapshot.health.delayRisk.toLowerCase()}`}>
           <span>Health Score</span>
-          <strong>{dashboard.health.score}</strong>
-          <small>{dashboard.health.status}</small>
+          <strong>{snapshot.health.score}</strong>
+          <small>Delay Risk: {snapshot.health.delayRisk}</small>
         </div>
       </section>
 
       <section className="dashboard-kpi-grid">
         <article>
-          <span>Activities</span>
-          <strong>{dashboard.activities.length}</strong>
-          <small>WBS records</small>
+          <span>Weekly Updated Activities</span>
+          <strong>{snapshot.weekly.activitiesUpdated}</strong>
+          <small>From latest weekly production</small>
         </article>
+
         <article>
           <span>Weight Earned</span>
           <strong>{earnedWeight.toFixed(1)}%</strong>
-          <small>Weighted production</small>
+          <small>Weighted construction progress</small>
         </article>
+
         <article>
           <span>Weight Remaining</span>
           <strong>{remainingWeight.toFixed(1)}%</strong>
           <small>To complete</small>
         </article>
+
         <article>
           <span>Critical Activities</span>
-          <strong>{dashboard.criticalActivities.length}</strong>
-          <small>Progress below threshold</small>
+          <strong>{snapshot.criticalActivities.length}</strong>
+          <small>Detected by Construction Engine</small>
         </article>
       </section>
 
@@ -99,16 +108,17 @@ export default function ProjectDashboard() {
         <article className="dashboard-panel">
           <h3>Discipline Progress</h3>
 
-          {dashboard.disciplines.length === 0 ? (
+          {snapshot.disciplines.length === 0 ? (
             <p className="dashboard-empty">No WBS disciplines yet.</p>
           ) : (
             <div className="discipline-progress-list">
-              {dashboard.disciplines.map((discipline) => (
+              {snapshot.disciplines.map((discipline) => (
                 <div key={discipline.discipline} className="discipline-progress-row">
                   <div className="discipline-progress-title">
                     <strong>{discipline.discipline}</strong>
                     <span>{Number(discipline.progress || 0).toFixed(1)}%</span>
                   </div>
+
                   <div className="dashboard-progress-track small">
                     <div
                       style={{
@@ -116,6 +126,7 @@ export default function ProjectDashboard() {
                       }}
                     />
                   </div>
+
                   <small>
                     {discipline.activities} activities ·{" "}
                     {Number(discipline.weightPercent || 0).toFixed(1)}% weight
@@ -129,13 +140,13 @@ export default function ProjectDashboard() {
         <article className="dashboard-panel">
           <h3>Critical Activities</h3>
 
-          {dashboard.criticalActivities.length === 0 ? (
+          {snapshot.criticalActivities.length === 0 ? (
             <p className="dashboard-empty">
               No critical activities detected by the Construction Engine.
             </p>
           ) : (
             <div className="critical-list">
-              {dashboard.criticalActivities.map((activity) => (
+              {snapshot.criticalActivities.map((activity) => (
                 <div key={activity.id} className="critical-row">
                   <div>
                     <strong>{activity.code}</strong>
