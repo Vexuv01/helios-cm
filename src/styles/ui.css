@@ -1,0 +1,23 @@
+.ui-button {
+  border: 0;
+  border-radius: 999px;
+  padding: 12px 18px;
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.ui-button.primary {
+  color: #141414;
+  background: #ffc72c;
+}
+
+.ui-button.secondary {
+  color: #f8fafc;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.ui-card {
+  background: rgba(255, 255, 255, 0.055);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 24px;
+}
