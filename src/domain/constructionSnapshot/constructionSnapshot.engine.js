@@ -9,7 +9,7 @@ export function buildConstructionSnapshot({ project, engine, lastWeekly }) {
 
     healthScore: engine?.healthScore ?? 0,
     healthStatus: engine?.healthStatus ?? "WATCH",
-    delayRisk: engine?.delayRisk ?? "LOW",
+    delayRisk: engine?.timeline?.milestoneRisk ?? engine?.delayRisk ?? "LOW",
     healthReasons: engine?.healthReasons ?? [],
 
     disciplineProgress: engine?.disciplineProgress ?? [],
@@ -23,14 +23,36 @@ export function buildConstructionSnapshot({ project, engine, lastWeekly }) {
 
     criticalActivities: engine?.criticalActivities ?? [],
 
+    timeline: {
+      today: engine?.timeline?.today ?? null,
+      plannedStart: engine?.timeline?.plannedStart ?? null,
+      plannedFinish: engine?.timeline?.plannedFinish ?? null,
+      actualStart: engine?.timeline?.actualStart ?? null,
+      actualFinish: engine?.timeline?.actualFinish ?? null,
+      delayDays: engine?.timeline?.delayDays ?? 0,
+      overdueActivities: engine?.timeline?.overdueActivities ?? [],
+      upcomingActivities: engine?.timeline?.upcomingActivities ?? [],
+      lookAhead: engine?.timeline?.lookAhead ?? [],
+      milestoneRisk: engine?.timeline?.milestoneRisk ?? "LOW",
+      forecastCOD: engine?.timeline?.forecastCOD ?? null,
+      activities: engine?.timeline?.activities ?? [],
+    },
+
     forecast: {
       plannedCOD: engine?.forecast?.plannedCOD ?? null,
-      forecastCOD: engine?.forecast?.forecastCOD ?? null,
+      forecastCOD:
+        engine?.timeline?.forecastCOD ??
+        engine?.forecast?.forecastCOD ??
+        null,
       varianceDays: engine?.forecast?.varianceDays ?? 0,
       confidence: engine?.forecast?.confidence ?? 100,
       weeklyVelocity: engine?.forecast?.weeklyVelocity ?? 0,
       remainingWeight: engine?.forecast?.remainingWeight ?? 0,
       recoveryIndex: engine?.forecast?.recoveryIndex ?? 100,
+      milestoneRisk:
+        engine?.forecast?.milestoneRisk ??
+        engine?.timeline?.milestoneRisk ??
+        "LOW",
     },
 
     decisionFeed: engine?.decisionFeed ?? [],

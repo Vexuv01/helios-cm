@@ -20,6 +20,21 @@ export function createConstructionSnapshot({
 
   criticalActivities = [],
 
+  timeline = {
+    today: null,
+    plannedStart: null,
+    plannedFinish: null,
+    actualStart: null,
+    actualFinish: null,
+    delayDays: 0,
+    overdueActivities: [],
+    upcomingActivities: [],
+    lookAhead: [],
+    milestoneRisk: "LOW",
+    forecastCOD: null,
+    activities: [],
+  },
+
   forecast = {
     plannedCOD: null,
     forecastCOD: null,
@@ -28,6 +43,7 @@ export function createConstructionSnapshot({
     weeklyVelocity: 0,
     remainingWeight: 0,
     recoveryIndex: 100,
+    milestoneRisk: "LOW",
   },
 
   decisionFeed = [],
@@ -60,6 +76,8 @@ export function createConstructionSnapshot({
     weekly: weeklyProduction,
 
     criticalActivities,
+
+    timeline,
 
     forecast,
 
