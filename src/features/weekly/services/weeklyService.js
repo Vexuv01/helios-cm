@@ -52,6 +52,7 @@ export async function loadWeeklyWorkspace(projectId, weekStart, weekEnd) {
       activity,
       entry,
       quantityThisWeek: Number(entry?.quantityThisWeek || 0),
+      notes: entry?.notes || "",
     };
   });
 
@@ -67,12 +68,14 @@ export async function saveWeeklyQuantity({
   weeklyReportId,
   wbsActivityId,
   quantityThisWeek,
+  notes = "",
 }) {
   const entry = await upsertWeeklyEntry({
     weeklyReportId,
     projectId,
     wbsActivityId,
     quantityThisWeek,
+    notes,
   });
 
   const installedQuantity = await sumInstalledQuantity(projectId, wbsActivityId);
