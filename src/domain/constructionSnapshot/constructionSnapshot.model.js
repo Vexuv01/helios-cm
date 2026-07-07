@@ -5,7 +5,9 @@ export function createConstructionSnapshot({
   earnedWeight = 0,
 
   healthScore = 0,
+  healthStatus = "WATCH",
   delayRisk = "LOW",
+  healthReasons = [],
 
   disciplineProgress = [],
 
@@ -13,6 +15,7 @@ export function createConstructionSnapshot({
     installedQuantity: 0,
     earnedWeight: 0,
     activitiesUpdated: 0,
+    totalActivities: 0,
   },
 
   criticalActivities = [],
@@ -22,7 +25,12 @@ export function createConstructionSnapshot({
     forecastCOD: null,
     varianceDays: 0,
     confidence: 100,
+    weeklyVelocity: 0,
+    remainingWeight: 0,
+    recoveryIndex: 100,
   },
+
+  decisionFeed = [],
 
   lastWeekly = {
     weekNumber: null,
@@ -42,7 +50,9 @@ export function createConstructionSnapshot({
 
     health: {
       score: healthScore,
+      status: healthStatus,
       delayRisk,
+      reasons: healthReasons,
     },
 
     disciplines: disciplineProgress,
@@ -52,6 +62,8 @@ export function createConstructionSnapshot({
     criticalActivities,
 
     forecast,
+
+    decisionFeed,
 
     lastWeekly,
   };
