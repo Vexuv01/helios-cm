@@ -30,27 +30,63 @@ function activityLabel(activity) {
   return activity?.code ? `${activity.code} · ${activity.name}` : activity?.name;
 }
 
-function ActivityList({ items = [], empty, mode = "standard" }) {
+function ActivityCard({ activity, mode = "standard" }) {
+  const isOverdue = mode === "overdue";
+
+  return (
+    <div className={`activity-card ${mode}`}>
+      <div className="activity-card-header">
+        <div>
+          <strong>{activityLabel(activity)}</strong>
+          <span>{activity.discipline || "General"}</span>
+        </div>
+
+        {isOverdue && activity.delayDays > 0 ? (
+          <b>{activity.delayDays}d</b>
+        ) : (
+          <b>{formatPercent(activity.progress)}</b>
+        )}
+      </div>
+
+      <div className="activity-card-meta">
+        {activity.plannedStart && (
+          <div>
+            <span>Start</span>
+            <strong>{formatDate(activity.plannedStart)}</strong>
+          </div>
+        )}
+
+        {activity.plannedFinish && (
+          <div>
+            <span>Finish</span>
+            <strong>{formatDate(activity.plannedFinish)}</strong>
+          </div>
+        )}
+
+        {isOverdue && (
+          <div>
+            <span>Delay</span>
+            <strong>{activity.delayDays || 0} days</strong>
+          </div>
+        )}
+      </div>
+
+      <div className="mini-progress-track">
+        <div style={{ width: `${Number(activity.progress || 0)}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function ActivityList({ items = [], empty, mode = "standard", limit = 5 }) {
   if (!items.length) {
     return <p className="dashboard-empty">{empty}</p>;
   }
 
   return (
-    <div className="activity-list">
-      {items.slice(0, 8).map((activity) => (
-        <div key={activity.id} className={`activity-row ${mode}`}>
-          <div>
-            <strong>{activityLabel(activity)}</strong>
-            <span>{activity.discipline || "General"}</span>
-          </div>
-
-          <div className="activity-meta">
-            {activity.delayDays > 0 && <b>{activity.delayDays}d delay</b>}
-            {activity.plannedStart && <small>Start {formatDate(activity.plannedStart)}</small>}
-            {activity.plannedFinish && <small>Finish {formatDate(activity.plannedFinish)}</small>}
-            <em>{formatPercent(activity.progress)}</em>
-          </div>
-        </div>
+    <div className="activity-card-list">
+      {items.slice(0, limit).map((activity) => (
+        <ActivityCard key={activity.id} activity={activity} mode={mode} />
       ))}
     </div>
   );
