@@ -15,16 +15,17 @@ function enrichActivity(activity) {
   const progress = calculateActivityProgress(activity);
   const weight = Number(activity.weightPercent || 0);
   const earnedWeight = (progress / 100) * weight;
+  const baselineQuantity = Number(activity.baselineQuantity || 0);
+  const installedQuantity = Number(activity.installedQuantity || 0);
 
   return {
     ...activity,
+    baselineQuantity,
+    installedQuantity,
+    weightPercent: weight,
     progress,
     earnedWeight,
-    remainingQuantity: Math.max(
-      Number(activity.baselineQuantity || 0) -
-        Number(activity.installedQuantity || 0),
-      0
-    ),
+    remainingQuantity: Math.max(baselineQuantity - installedQuantity, 0),
     isCritical: weight > 0 && progress < 35,
   };
 }
@@ -60,7 +61,47 @@ function buildDisciplineProgress(activities) {
     .sort((a, b) => b.weightPercent - a.weightPercent);
 }
 
-export function buildConstructionSnapshot(activities = []) {
+function calculateHealthScore({ overallProgress, criticalActivities }) {
+  const criticalPenalty = Math.min(criticalActivities.length * 8, 40);
+  const progressPenalty = overallProgress < 10 ? 15 : 0;
+
+  return clamp(100 - criticalPenalty - progressPenalty);
+}
+
+function calculateDelayRisk({ healthScore, criticalActivities }) {
+  if (healthScore < 50 || criticalActivities.length >= 5) return "HIGH";
+  if (healthScore < 75 || criticalActivities.length >= 3) return "MEDIUM";
+  return "LOW";
+}
+
+function buildWeeklyProduction(activities) {
+  const updatedActivities = activities.filter(
+    (activity) => Number(activity.installedQuantity || 0) > 0
+  );
+
+  return {
+    installedQuantity: updatedActivities.reduce(
+      (sum, activity) => sum + Number(activity.installedQuantity || 0),
+      0
+    ),
+    earnedWeight: activities.reduce(
+      (sum, activity) => sum + Number(activity.earnedWeight || 0),
+      0
+    ),
+    activitiesUpdated: updatedActivities.length,
+  };
+}
+
+function buildForecast({ project, overallProgress, healthScore }) {
+  return {
+    plannedCOD: project?.plannedCOD ?? null,
+    forecastCOD: project?.forecastCOD ?? project?.plannedCOD ?? null,
+    varianceDays: 0,
+    confidence: clamp(Math.round((healthScore + overallProgress) / 2)),
+  };
+}
+
+export function runConstructionEngine({ project = null, activities = [] } = {}) {
   const enrichedActivities = activities.map(enrichActivity);
 
   const totals = enrichedActivities.reduce(
@@ -84,21 +125,57 @@ export function buildConstructionSnapshot(activities = []) {
       ? clamp((totals.earnedWeight / totals.weightPercent) * 100)
       : 0;
 
-  const disciplines = buildDisciplineProgress(enrichedActivities);
+  const disciplineProgress = buildDisciplineProgress(enrichedActivities);
 
   const criticalActivities = enrichedActivities
     .filter((activity) => activity.isCritical)
     .sort((a, b) => a.progress - b.progress)
     .slice(0, 5);
 
+  const healthScore = calculateHealthScore({
+    overallProgress,
+    criticalActivities,
+  });
+
+  const delayRisk = calculateDelayRisk({
+    healthScore,
+    criticalActivities,
+  });
+
+  const weeklyProduction = buildWeeklyProduction(enrichedActivities);
+
+  const forecast = buildForecast({
+    project,
+    overallProgress,
+    healthScore,
+  });
+
   return {
     activities: enrichedActivities,
+
     totals: {
       ...totals,
       progress: overallProgress,
       remainingWeight: Math.max(totals.weightPercent - totals.earnedWeight, 0),
     },
-    disciplines,
+
+    overallProgress,
+    earnedWeight: totals.earnedWeight,
+    remainingWeight: Math.max(totals.weightPercent - totals.earnedWeight, 0),
+
+    disciplineProgress,
+    disciplines: disciplineProgress,
+
     criticalActivities,
+
+    healthScore,
+    delayRisk,
+
+    weeklyProduction,
+    forecast,
   };
+}
+
+export function buildConstructionSnapshot(activities = []) {
+  return runConstructionEngine({ activities });
 }

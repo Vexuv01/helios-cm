@@ -1,5 +1,5 @@
 import { buildConstructionSnapshot as buildSnapshotContract } from "../domain/constructionSnapshot";
-import { buildConstructionSnapshot as runConstructionEngine } from "../domain/construction-engine";
+import { runConstructionEngine } from "../domain/construction-engine";
 import { supabase } from "../lib/supabaseClient";
 import { getProjects } from "../repositories/projectRepository";
 import { listWbsActivities } from "../features/wbs/repositories/wbsRepository";
@@ -41,15 +41,17 @@ export async function getConstructionSnapshot(projectId) {
     throw new Error("Project not found");
   }
 
-  const wbsActivities = await listWbsActivities(projectId);
+  const activities = await listWbsActivities(projectId);
   const weeklyReports = await listWeeklyReportsByProject(projectId);
 
-  const engine = runConstructionEngine(wbsActivities);
-  const lastWeekly = weeklyReports[0] ?? null;
+  const engine = runConstructionEngine({
+    project,
+    activities,
+  });
 
   return buildSnapshotContract({
     project,
     engine,
-    lastWeekly,
+    lastWeekly: weeklyReports[0] ?? null,
   });
 }
