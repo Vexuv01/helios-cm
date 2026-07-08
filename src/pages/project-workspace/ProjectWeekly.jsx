@@ -17,10 +17,10 @@ function getWeekRange(date = new Date()) {
   };
 }
 
-function shiftWeek(weekStart, offset) {
+function shiftWeekStart(weekStart, offset) {
   const date = new Date(`${weekStart}T00:00:00`);
   date.setDate(date.getDate() + offset * 7);
-  return getWeekRange(date);
+  return getWeekRange(date).weekStart;
 }
 
 function toNumber(value) {
@@ -34,14 +34,7 @@ function percent(actual, baseline) {
 }
 
 function getEntryQty(entry) {
-  return toNumber(
-    entry.actual_quantity ??
-      entry.installed_quantity ??
-      entry.produced_quantity ??
-      entry.quantity ??
-      entry.qty ??
-      0
-  );
+  return toNumber(entry.actual_quantity ?? entry.installed_quantity ?? entry.produced_quantity ?? entry.quantity ?? entry.qty ?? 0);
 }
 
 function getEntryActivityId(entry) {
@@ -52,15 +45,13 @@ function isActualStatus(status) {
   return ["SUBMITTED", "VALIDATED", "APPROVED"].includes(String(status || "").toUpperCase());
 }
 
-function isLockedStatus(status) {
-  return ["SUBMITTED", "VALIDATED", "APPROVED"].includes(String(status || "").toUpperCase());
-}
-
 export default function ProjectWeekly() {
   const params = useParams();
   const routeProjectId = params.projectId || params.id;
 
-  const [week, setWeek] = useState(() => getWeekRange());
+  const [weekStart, setWeekStart] = useState(() => getWeekRange().weekStart);
+  const week = useMemo(() => getWeekRange(new Date(`${weekStart}T00:00:00`)), [weekStart]);
+
   const [projects, setProjects] = useState([]);
   const [projectId, setProjectId] = useState(routeProjectId || "");
   const [reports, setReports] = useState([]);
@@ -73,7 +64,7 @@ export default function ProjectWeekly() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  const locked = isLockedStatus(report?.status);
+  const locked = isActualStatus(report?.status);
 
   const operationalActivities = useMemo(
     () => activities.filter((activity) => activity.is_group !== true),
@@ -94,7 +85,6 @@ export default function ProjectWeekly() {
         String(activity.name || "").toLowerCase().includes(term);
 
       const matchDiscipline = discipline === "all" || activity.discipline === discipline;
-
       return matchSearch && matchDiscipline;
     });
   }, [discipline, operationalActivities, search]);
@@ -109,97 +99,92 @@ export default function ProjectWeekly() {
     [weeklyValues]
   );
 
-  const loadWeekly = useCallback(
-    async (targetProjectId = projectId, targetWeek = week) => {
-      setLoading(true);
+  const loadWeekly = useCallback(async (targetProjectId, targetWeekStart) => {
+    setLoading(true);
 
-      const { data: projectRows, error: projectsError } = await supabase
-        .from("projects")
-        .select("*")
-        .order("code", { ascending: true });
+    const { data: projectRows, error: projectsError } = await supabase
+      .from("projects")
+      .select("*")
+      .order("code", { ascending: true });
 
-      if (projectsError) alert(projectsError.message);
+    if (projectsError) alert(projectsError.message);
 
-      const nextProjects = projectRows || [];
-      const nextProjectId = targetProjectId || routeProjectId || nextProjects[0]?.id || "";
+    const nextProjects = projectRows || [];
+    const nextProjectId = targetProjectId || routeProjectId || nextProjects[0]?.id || "";
+    const targetWeek = getWeekRange(new Date(`${targetWeekStart}T00:00:00`));
 
-      setProjects(nextProjects);
-      setProjectId(nextProjectId);
+    setProjects(nextProjects);
+    setProjectId(nextProjectId);
 
-      if (!nextProjectId) {
-        setActivities([]);
-        setLoading(false);
-        return;
-      }
-
-      const { data: wbsRows, error: wbsError } = await supabase
-        .from("wbs_activities")
-        .select("*")
-        .eq("project_id", nextProjectId)
-        .order("sort_order", { ascending: true })
-        .order("code", { ascending: true });
-
-      if (wbsError) alert(wbsError.message);
-
-      const { data: reportRows, error: reportsError } = await supabase
-        .from("weekly_reports")
-        .select("*")
-        .eq("project_id", nextProjectId)
-        .order("week_start", { ascending: true });
-
-      if (reportsError) alert(reportsError.message);
-
-      const nextReports = reportRows || [];
-      const currentReport =
-        nextReports.find((item) => item.week_start === targetWeek.weekStart) || null;
-
-      const reportIds = nextReports.map((item) => item.id);
-      let entries = [];
-
-      if (reportIds.length > 0) {
-        const { data: entryRows, error: entriesError } = await supabase
-          .from("weekly_entries")
-          .select("*")
-          .in("weekly_report_id", reportIds);
-
-        if (entriesError) alert(entriesError.message);
-        entries = entryRows || [];
-      }
-
-      const currentValues = {};
-      const cumulative = {};
-
-      entries.forEach((entry) => {
-        const activityId = getEntryActivityId(entry);
-        if (!activityId) return;
-
-        const relatedReport = nextReports.find((item) => item.id === entry.weekly_report_id);
-        const qty = getEntryQty(entry);
-
-        if (relatedReport?.id === currentReport?.id) {
-          currentValues[activityId] = qty;
-        }
-
-        const isBeforeCurrentWeek = relatedReport?.week_start < targetWeek.weekStart;
-
-        if (isBeforeCurrentWeek && isActualStatus(relatedReport?.status)) {
-          cumulative[activityId] = toNumber(cumulative[activityId]) + qty;
-        }
-      });
-
-      setReports(nextReports);
-      setReport(currentReport);
-      setActivities(wbsRows || []);
-      setWeeklyValues(currentValues);
-      setCumulativeValues(cumulative);
+    if (!nextProjectId) {
+      setActivities([]);
       setLoading(false);
-    },
-    [projectId, routeProjectId, week]
-  );
+      return;
+    }
+
+    const { data: wbsRows, error: wbsError } = await supabase
+      .from("wbs_activities")
+      .select("*")
+      .eq("project_id", nextProjectId)
+      .order("sort_order", { ascending: true })
+      .order("code", { ascending: true });
+
+    if (wbsError) alert(wbsError.message);
+
+    const { data: reportRows, error: reportsError } = await supabase
+      .from("weekly_reports")
+      .select("*")
+      .eq("project_id", nextProjectId)
+      .order("week_start", { ascending: true });
+
+    if (reportsError) alert(reportsError.message);
+
+    const nextReports = reportRows || [];
+    const currentReport = nextReports.find((item) => item.week_start === targetWeek.weekStart) || null;
+
+    const reportIds = nextReports.map((item) => item.id);
+    let entries = [];
+
+    if (reportIds.length > 0) {
+      const { data: entryRows, error: entriesError } = await supabase
+        .from("weekly_entries")
+        .select("*")
+        .in("weekly_report_id", reportIds);
+
+      if (entriesError) alert(entriesError.message);
+      entries = entryRows || [];
+    }
+
+    const currentValues = {};
+    const cumulative = {};
+
+    entries.forEach((entry) => {
+      const activityId = getEntryActivityId(entry);
+      if (!activityId) return;
+
+      const relatedReport = nextReports.find((item) => item.id === entry.weekly_report_id);
+      const qty = getEntryQty(entry);
+
+      if (relatedReport?.id === currentReport?.id) {
+        currentValues[activityId] = qty;
+      }
+
+      if (relatedReport?.week_start < targetWeek.weekStart && isActualStatus(relatedReport?.status)) {
+        cumulative[activityId] = toNumber(cumulative[activityId]) + qty;
+      }
+    });
+
+    setReports(nextReports);
+    setReport(currentReport);
+    setActivities(wbsRows || []);
+    setWeeklyValues(currentValues);
+    setCumulativeValues(cumulative);
+    setLoading(false);
+  }, [routeProjectId]);
 
   useEffect(() => {
-    loadWeekly();
-  }, [loadWeekly]);
+    loadWeekly(projectId, weekStart);
+  }, [loadWeekly, projectId, weekStart]);
 
   async function ensureReport(status = "DRAFT") {
     const { data, error } = await supabase
@@ -231,10 +216,7 @@ export default function ProjectWeekly() {
     try {
       const savedReport = await ensureReport(nextStatus);
 
-      await supabase
-        .from("weekly_entries")
-        .delete()
-        .eq("weekly_report_id", savedReport.id);
+      await supabase.from("weekly_entries").delete().eq("weekly_report_id", savedReport.id);
 
       const payload = Object.entries(weeklyValues)
         .filter(([, value]) => toNumber(value) !== 0)
@@ -251,7 +233,7 @@ export default function ProjectWeekly() {
         if (error) throw new Error(error.message);
       }
 
-      await loadWeekly(projectId, week);
+      await loadWeekly(projectId, weekStart);
     } catch (error) {
       alert(error.message);
     } finally {
@@ -265,22 +247,17 @@ export default function ProjectWeekly() {
       return;
     }
 
-    const confirmed = window.confirm("Confermi il submit della Weekly? Dopo il submit non sarà più modificabile dall'EPC.");
-    if (!confirmed) return;
+    if (!window.confirm("Confermi il submit della Weekly? Dopo il submit non sarà più modificabile dall'EPC.")) return;
 
     await saveWeekly("SUBMITTED");
   }
 
   function goToPreviousWeek() {
-    const nextWeek = shiftWeek(week.weekStart, -1);
-    setWeek(nextWeek);
-    loadWeekly(projectId, nextWeek);
+    setWeekStart((current) => shiftWeekStart(current, -1));
   }
 
   function goToNextWeek() {
-    const nextWeek = shiftWeek(week.weekStart, 1);
-    setWeek(nextWeek);
-    loadWeekly(projectId, nextWeek);
+    setWeekStart((current) => shiftWeekStart(current, 1));
   }
 
   return (
@@ -294,14 +271,7 @@ export default function ProjectWeekly() {
 
         <div className="cw-project-select">
           <label>Project</label>
-          <select
-            value={projectId}
-            onChange={(event) => {
-              const nextProjectId = event.target.value;
-              setProjectId(nextProjectId);
-              loadWeekly(nextProjectId, week);
-            }}
-          >
+          <select value={projectId} onChange={(event) => setProjectId(event.target.value)}>
             {projects.map((project) => (
               <option key={project.id} value={project.id}>
                 {project.code} · {project.name}
@@ -314,7 +284,7 @@ export default function ProjectWeekly() {
       <section className="weekly-period-bar">
         <button type="button" onClick={goToPreviousWeek}>← Previous week</button>
         <div>
-          <span>Current Weekly Period</span>
+          <span>Weekly Period</span>
           <strong>{week.weekStart} / {week.weekEnd}</strong>
           <small>Status: {report?.status || "DRAFT"}</small>
         </div>
@@ -322,36 +292,17 @@ export default function ProjectWeekly() {
       </section>
 
       <section className="cw-metrics">
-        <div>
-          <span>Status</span>
-          <strong>{report?.status || "DRAFT"}</strong>
-        </div>
-        <div>
-          <span>Activities</span>
-          <strong>{operationalActivities.length}</strong>
-        </div>
-        <div>
-          <span>Rows Updated</span>
-          <strong>{activeRows}</strong>
-        </div>
-        <div>
-          <span>Weekly Qty</span>
-          <strong>{weeklyTotal}</strong>
-        </div>
-        <div>
-          <span>Historical Reports</span>
-          <strong>{reports.length}</strong>
-        </div>
+        <div><span>Status</span><strong>{report?.status || "DRAFT"}</strong></div>
+        <div><span>Activities</span><strong>{operationalActivities.length}</strong></div>
+        <div><span>Rows Updated</span><strong>{activeRows}</strong></div>
+        <div><span>Weekly Qty</span><strong>{weeklyTotal}</strong></div>
+        <div><span>Historical Reports</span><strong>{reports.length}</strong></div>
       </section>
 
       <section className="cw-save-bar">
         <div>
           <strong>{locked ? "Weekly locked" : "Weekly editable"}</strong>
-          <span>
-            {locked
-              ? "Questa Weekly è stata inviata. L'Actual della Control Room la considera come produzione reale."
-              : "Salva come Draft durante la settimana. Submit quando vuoi inviarla a DL / IPP."}
-          </span>
+          <span>{locked ? "Questa Weekly è stata inviata e alimenta la Control Room." : "Salva Draft durante la settimana. Submit quando vuoi inviarla."}</span>
         </div>
 
         <div className="weekly-actions">
@@ -365,17 +316,10 @@ export default function ProjectWeekly() {
       </section>
 
       <section className="cw-toolbar weekly-toolbar">
-        <input
-          placeholder="Search production activity..."
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-        />
-
+        <input placeholder="Search production activity..." value={search} onChange={(event) => setSearch(event.target.value)} />
         <select value={discipline} onChange={(event) => setDiscipline(event.target.value)}>
           <option value="all">All disciplines</option>
-          {disciplines.map((item) => (
-            <option key={item} value={item}>{item}</option>
-          ))}
+          {disciplines.map((item) => <option key={item} value={item}>{item}</option>)}
         </select>
       </section>
 
@@ -401,8 +345,7 @@ export default function ProjectWeekly() {
               {visibleActivities.map((activity) => {
                 const cumulative = toNumber(cumulativeValues[activity.id]);
                 const weeklyQty = toNumber(weeklyValues[activity.id]);
-                const projected = cumulative + weeklyQty;
-                const progress = percent(projected, activity.baseline_quantity);
+                const progress = percent(cumulative + weeklyQty, activity.baseline_quantity);
 
                 return (
                   <tr key={activity.id}>
