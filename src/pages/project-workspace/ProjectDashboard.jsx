@@ -186,6 +186,33 @@ export default function ProjectDashboard() {
             </div>
           </section>
 
+
+          <section className="control-kpis">
+            <div className="hero-kpi">
+              <span>Actual Source</span>
+              <strong>{dashboard.dataSource.actualSource}</strong>
+              <small>{dashboard.dataSource.weeklyReports} reports · {dashboard.dataSource.weeklyEntries} entries</small>
+            </div>
+
+            <div className="hero-kpi">
+              <span>Planned Source</span>
+              <strong>{dashboard.dataSource.activitiesWithDates}/{dashboard.dataSource.wbsActivities}</strong>
+              <small>Activities with planned dates</small>
+            </div>
+
+            <div className="hero-kpi">
+              <span>Started by Today</span>
+              <strong>{dashboard.dataSource.activitiesStartedByToday}</strong>
+              <small>{dashboard.dataSource.today}</small>
+            </div>
+
+            <div className="hero-kpi">
+              <span>Total Weight</span>
+              <strong>{dashboard.dataSource.totalWeight}%</strong>
+              <small>Weight totale della WBS</small>
+            </div>
+          </section>
+
           <section className="chart-grid-main">
             <div className="dashboard-card chart-card wide">
               <div className="dashboard-card-head">
