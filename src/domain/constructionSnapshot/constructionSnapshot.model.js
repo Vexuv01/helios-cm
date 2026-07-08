@@ -2,6 +2,8 @@ export function createConstructionSnapshot({
   project,
 
   overallProgress = 0,
+  plannedProgress = 0,
+  scheduleVariance = 0,
   earnedWeight = 0,
 
   healthScore = 0,
@@ -61,6 +63,8 @@ export function createConstructionSnapshot({
 
     progress: {
       overallProgress,
+      plannedProgress,
+      scheduleVariance,
       earnedWeight,
     },
 
@@ -72,17 +76,11 @@ export function createConstructionSnapshot({
     },
 
     disciplines: disciplineProgress,
-
     weekly: weeklyProduction,
-
     criticalActivities,
-
     timeline,
-
     forecast,
-
     decisionFeed,
-
     lastWeekly,
   };
 }

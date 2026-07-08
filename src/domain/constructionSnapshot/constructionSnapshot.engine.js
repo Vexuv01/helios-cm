@@ -5,6 +5,8 @@ export function buildConstructionSnapshot({ project, engine, lastWeekly }) {
     project,
 
     overallProgress: engine?.overallProgress ?? 0,
+    plannedProgress: engine?.plannedProgress ?? 0,
+    scheduleVariance: engine?.scheduleVariance ?? 0,
     earnedWeight: engine?.earnedWeight ?? 0,
 
     healthScore: engine?.healthScore ?? 0,
@@ -40,10 +42,7 @@ export function buildConstructionSnapshot({ project, engine, lastWeekly }) {
 
     forecast: {
       plannedCOD: engine?.forecast?.plannedCOD ?? null,
-      forecastCOD:
-        engine?.timeline?.forecastCOD ??
-        engine?.forecast?.forecastCOD ??
-        null,
+      forecastCOD: engine?.timeline?.forecastCOD ?? engine?.forecast?.forecastCOD ?? null,
       varianceDays: engine?.forecast?.varianceDays ?? 0,
       confidence: engine?.forecast?.confidence ?? 100,
       weeklyVelocity: engine?.forecast?.weeklyVelocity ?? 0,

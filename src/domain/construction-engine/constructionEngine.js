@@ -16,7 +16,7 @@ export function runConstructionEngine({ project = null, activities = [] } = {}) 
 
   const timeline = calculateTimeline({
     project,
-    activities,
+    activities: progress.activities,
     progress,
   });
 
@@ -44,16 +44,17 @@ export function runConstructionEngine({ project = null, activities = [] } = {}) 
 
   return {
     activities: progress.activities,
-
     totals: progress.totals,
 
     overallProgress: progress.overallProgress,
+    plannedProgress: progress.plannedProgress,
+    scheduleVariance: progress.scheduleVariance,
     earnedWeight: progress.earnedWeight,
+    plannedWeight: progress.plannedWeight,
     remainingWeight: progress.remainingWeight,
 
     disciplineProgress,
     disciplines: disciplineProgress,
-
     criticalActivities,
 
     timeline,
