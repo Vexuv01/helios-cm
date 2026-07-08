@@ -1,0 +1,68 @@
+.construction-workspace-page {
+  display: grid;
+  gap: 20px;
+}
+
+.construction-workspace-header {
+  padding: 24px;
+  border-radius: 30px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background:
+    radial-gradient(circle at top left, rgba(56, 189, 248, 0.12), transparent 34%),
+    rgba(2, 6, 23, 0.48);
+  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.24);
+}
+
+.construction-workspace-header span {
+  display: block;
+  color: #94a3b8;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.11em;
+  font-weight: 950;
+}
+
+.construction-workspace-header h2 {
+  margin: 8px 0;
+  font-size: clamp(34px, 5vw, 56px);
+  line-height: 0.95;
+  letter-spacing: -0.07em;
+}
+
+.construction-workspace-header p {
+  max-width: 780px;
+  margin: 0;
+  color: #94a3b8;
+  font-weight: 760;
+}
+
+.construction-workspace-tabs {
+  display: flex;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 22px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(2, 6, 23, 0.44);
+  overflow-x: auto;
+}
+
+.construction-workspace-tabs button {
+  border: 0;
+  border-radius: 16px;
+  padding: 12px 16px;
+  background: rgba(148, 163, 184, 0.12);
+  color: #cbd5e1;
+  font-weight: 950;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.construction-workspace-tabs button.active {
+  background: #f8fafc;
+  color: #020617;
+}
+
+.construction-workspace-content {
+  display: grid;
+  gap: 20px;
+}

@@ -3,7 +3,7 @@ import Portfolio from "../pages/Portfolio";
 import ProjectWorkspaceLayout from "../features/projects/layouts/ProjectWorkspaceLayout";
 
 import ProjectDashboard from "../pages/project-workspace/ProjectDashboard";
-import ProjectWbs from "../pages/project-workspace/ProjectWbs";
+import ConstructionWorkspace from "../pages/project-workspace/ConstructionWorkspace";
 import ProjectWeekly from "../pages/project-workspace/ProjectWeekly";
 import ProjectDocuments from "../pages/project-workspace/ProjectDocuments";
 import ProjectIssues from "../pages/project-workspace/ProjectIssues";
@@ -20,7 +20,7 @@ export default function AppRoutes() {
         <Route path="/projects/:projectId" element={<ProjectWorkspaceLayout />}>
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<ProjectDashboard />} />
-          <Route path="wbs" element={<ProjectWbs />} />
+          <Route path="wbs" element={<ConstructionWorkspace />} />
           <Route path="weekly" element={<ProjectWeekly />} />
           <Route path="documents" element={<ProjectDocuments />} />
           <Route path="issues" element={<ProjectIssues />} />
