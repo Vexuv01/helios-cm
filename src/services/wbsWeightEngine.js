@@ -4,7 +4,7 @@ function toNumber(value) {
 }
 
 function isOperationalActivity(row) {
-  return row.code?.includes(".") || row.parent_id;
+  return row.is_group !== true;
 }
 
 export function buildWbsWeightModel(rows = []) {

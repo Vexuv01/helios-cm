@@ -20,7 +20,7 @@ function toNumber(value) {
 }
 
 function isOperationalActivity(activity) {
-  return activity.code?.includes(".") || activity.parent_id;
+  return activity.is_group !== true;
 }
 
 export default function ConstructionWorkspace() {
