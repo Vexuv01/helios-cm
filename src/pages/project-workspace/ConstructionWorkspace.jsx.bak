@@ -9,12 +9,19 @@ import {
 import ActivityPhotos from "../../features/construction-photos/ActivityPhotos";
 import ActivityDocuments from "../../features/construction-documents/ActivityDocuments";
 import "../../styles/construction-workspace.css";
-import {
-  toNumber as n,
-  percent as pct,
-  progress,
-  remaining,
-} from "../../features/construction-workspace/services/activityMetrics";
+
+function n(value) {
+  return Number(value || 0);
+}
+
+function pct(value) {
+  return `${n(value).toFixed(1)}%`;
+}
+
+function progress(activity) {
+  if (!activity || n(activity.baselineQuantity) <= 0) return 0;
+  return Math.min((n(activity.installedQuantity) / n(activity.baselineQuantity)) * 100, 100);
+}
 
 export default function ConstructionWorkspace() {
   const { projectId } = useProject();
@@ -224,25 +231,16 @@ export default function ConstructionWorkspace() {
                 <article>
                   <span>Remaining</span>
                   <strong>
-                    {remaining(selectedActivity).toFixed(2)}{" "}
+                    {Math.max(
+                      n(selectedActivity.baselineQuantity) - n(selectedActivity.installedQuantity),
+                      0
+                    ).toFixed(2)}{" "}
                     {selectedActivity.unit}
                   </strong>
                 </article>
                 <article>
                   <span>Progress</span>
                   <strong>{pct(progress(selectedActivity))}</strong>
-                </article>
-
-                <article>
-                  <span>This Week</span>
-                  <strong>
-                    {Number(weeklyQty || 0).toFixed(2)} {selectedActivity.unit}
-                  </strong>
-                </article>
-
-                <article>
-                  <span>Status</span>
-                  <strong>{selectedActivity.status || "BASELINE"}</strong>
                 </article>
               </section>
 
