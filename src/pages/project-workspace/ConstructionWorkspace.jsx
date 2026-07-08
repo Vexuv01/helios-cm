@@ -287,8 +287,7 @@ export default function ConstructionWorkspace() {
               <tr>
                 <th>Code</th>
                 <th>Activity</th>
-                <th>Level</th>
-                <th>Parent</th>
+                <th>Macro Category</th>
                 <th>Fase</th>
                 <th>U.M.</th>
                 <th>Quantity</th>
@@ -321,22 +320,22 @@ export default function ConstructionWorkspace() {
                       />
                     </td>
                     <td>
-                      <strong>L{activity.level}</strong>
-                    </td>
-                    <td>
-                      <select
-                        value={activity.parent_id || ""}
-                        onChange={(event) => updateActivity(activity.id, "parent_id", event.target.value)}
-                      >
-                        <option value="">Root</option>
-                        {categories
-                          .filter((categoryItem) => categoryItem.id !== activity.id)
-                          .map((categoryItem) => (
-                            <option key={categoryItem.id} value={categoryItem.id}>
-                              {categoryItem.code} · {categoryItem.name}
-                            </option>
-                          ))}
-                      </select>
+                      {activity.parent_id ? (
+                        <select
+                          value={activity.parent_id}
+                          onChange={(event) => updateActivity(activity.id, "parent_id", event.target.value)}
+                        >
+                          {categories
+                            .filter((categoryItem) => categoryItem.id !== activity.id)
+                            .map((categoryItem) => (
+                              <option key={categoryItem.id} value={categoryItem.id}>
+                                {categoryItem.code} · {categoryItem.name}
+                              </option>
+                            ))}
+                        </select>
+                      ) : (
+                        <strong>Macro Category</strong>
+                      )}
                     </td>
                     <td>
                       <input
