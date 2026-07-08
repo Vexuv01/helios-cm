@@ -11,7 +11,7 @@ function round(value, digits = 1) {
 
 function parseDate(value) {
   if (!value) return null;
-  const date = new Date(value);
+  const date = new Date(`${value}T00:00:00`);
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
@@ -31,10 +31,6 @@ function plannedProgress(activity, today = new Date()) {
   return Math.min(Math.max((elapsed / total) * 100, 0), 100);
 }
 
-function projectLocation(project) {
-  return [project?.municipality, project?.province, project?.region].filter(Boolean).join(" · ");
-}
-
 async function loadProject(projectId) {
   const { data, error } = await supabase.from("projects").select("*").eq("id", projectId).single();
   if (error) throw new Error(error.message);
@@ -46,7 +42,8 @@ async function loadWbs(projectId) {
     .from("wbs_activities")
     .select("*")
     .eq("project_id", projectId)
-    .order("sort_order", { ascending: true });
+    .order("sort_order", { ascending: true })
+    .order("code", { ascending: true });
 
   if (error) throw new Error(error.message);
 
@@ -69,21 +66,9 @@ async function loadWeeklyEntries(reportIds) {
   if (reportIds.length === 0) return [];
 
   const attempts = [
-    async () =>
-      supabase
-        .from("weekly_entries")
-        .select("*")
-        .in("weekly_report_id", reportIds),
-    async () =>
-      supabase
-        .from("weekly_production")
-        .select("*")
-        .in("weekly_report_id", reportIds),
-    async () =>
-      supabase
-        .from("weekly_activities")
-        .select("*")
-        .in("weekly_report_id", reportIds),
+    async () => supabase.from("weekly_entries").select("*").in("weekly_report_id", reportIds),
+    async () => supabase.from("weekly_production").select("*").in("weekly_report_id", reportIds),
+    async () => supabase.from("weekly_activities").select("*").in("weekly_report_id", reportIds),
   ];
 
   for (const attempt of attempts) {
@@ -118,27 +103,11 @@ function buildActualMap(entries) {
   }, {});
 }
 
-function buildCurve({ activities, actualMap }) {
-  const today = new Date();
-
-  const planned = round(
-    activities.reduce((sum, activity) => {
-      return sum + (plannedProgress(activity, today) / 100) * n(activity.weight_percent);
-    }, 0)
-  );
-
-  const actual = round(
-    activities.reduce((sum, activity) => {
-      const baseline = n(activity.baseline_quantity);
-      const installed = n(actualMap[activity.id]);
-      const progress = baseline > 0 ? Math.min((installed / baseline) * 100, 100) : 0;
-      return sum + (progress / 100) * n(activity.weight_percent);
-    }, 0)
-  );
-
+function buildCurve({ plannedProgressValue, actualProgress }) {
   return [
-    { week: "Baseline", planned: 0, actual: 0 },
-    { week: "Today", planned, actual },
+    { week: "Start", planned: 0, actual: 0 },
+    { week: "Today", planned: plannedProgressValue, actual: actualProgress },
+    { week: "Finish", planned: 100, actual: actualProgress },
   ];
 }
 
@@ -176,6 +145,8 @@ export async function loadRealConstructionDashboard(projectId) {
       status: activity.status,
       plannedStart: activity.planned_start,
       plannedFinish: activity.planned_finish,
+      hasDates: Boolean(activity.planned_start && activity.planned_finish),
+      hasWeight: weight > 0,
     };
   });
 
@@ -186,6 +157,13 @@ export async function loadRealConstructionDashboard(projectId) {
   const actualProgress = totalWeight > 0 ? round((earnedWeight / totalWeight) * 100) : 0;
   const plannedProgressValue = totalWeight > 0 ? round((plannedWeight / totalWeight) * 100) : 0;
   const scheduleGap = round(actualProgress - plannedProgressValue);
+
+  const activitiesWithDates = enriched.filter((item) => item.hasDates).length;
+  const activitiesWithWeight = enriched.filter((item) => item.hasWeight).length;
+  const activitiesStartedByToday = enriched.filter((item) => {
+    const start = parseDate(item.plannedStart);
+    return start && start <= today;
+  }).length;
 
   const criticalActivities = enriched
     .filter((item) => item.plannedProgress >= 20 && item.actualProgress < item.plannedProgress - 10)
@@ -228,8 +206,8 @@ export async function loadRealConstructionDashboard(projectId) {
       code: project.code,
       name: project.name,
       status: project.status || null,
-      location: projectLocation(project),
     },
+
     totalProgress: actualProgress,
     plannedProgress: plannedProgressValue,
     scheduleGap,
@@ -237,24 +215,42 @@ export async function loadRealConstructionDashboard(projectId) {
     blocked,
     criticalActivities,
     disciplines,
-    curve: buildCurve({ activities, actualMap }),
+
+    curve: buildCurve({ plannedProgressValue, actualProgress }),
+
     weightDistribution: disciplines.map((item) => ({
       discipline: item.discipline,
       value: round(item.weight),
     })),
+
     healthBreakdown: [
       { label: "Health", value: healthScore },
       { label: "Risk", value: 100 - healthScore },
     ],
+
     weeklyReports: reports.length,
     weeklyEntries: entries.length,
+
+    dataSource: {
+      actualSource: "Weekly only",
+      plannedSource: "WBS dates + WBS weight",
+      wbsActivities: activities.length,
+      activitiesWithDates,
+      activitiesWithWeight,
+      activitiesStartedByToday,
+      totalWeight: round(totalWeight, 2),
+      weeklyReports: reports.length,
+      weeklyEntries: entries.length,
+      today: today.toISOString().slice(0, 10),
+    },
+
     decisionFeed:
       reports.length === 0
         ? [
             {
               type: "DATA",
               title: "Nessuna Weekly reale caricata",
-              message: "Actual Progress impostato a 0%. La Control Room non usa più installed_quantity della WBS.",
+              message: "Actual Progress è 0%. La Control Room usa solo Weekly submitted / validated / approved.",
             },
           ]
         : criticalActivities.slice(0, 4).map((activity) => ({
