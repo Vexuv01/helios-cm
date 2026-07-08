@@ -228,6 +228,7 @@ export default function ConstructionWorkspace() {
     }
 
     const payload = rows.map((row) => ({
+      project_id: projectId,
       weekly_report_id: report.id,
       activity_id: row.activity_id,
       actual_quantity: row.actual_quantity,
