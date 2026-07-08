@@ -502,3 +502,34 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 }
+
+.activity-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 12px 18px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+  overflow-x: auto;
+}
+
+.activity-tabs button {
+  border: 0;
+  border-radius: 999px;
+  padding: 9px 13px;
+  background: rgba(148, 163, 184, 0.12);
+  color: #cbd5e1;
+  font-weight: 950;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.activity-tabs button.active {
+  background: #f8fafc;
+  color: #020617;
+}
+
+.activity-placeholder {
+  margin: 0;
+  color: #94a3b8;
+  font-weight: 800;
+  line-height: 1.5;
+}
