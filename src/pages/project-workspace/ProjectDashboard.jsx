@@ -85,7 +85,7 @@ export default function ProjectDashboard() {
             ))}
           </select>
 
-          <Link to={`/projects/${projectId}/construction`}>Open WBS Grid</Link>
+          <Link to={`/projects/${projectId}/wbs`}>Manage Construction</Link>
         </div>
       </header>
 
