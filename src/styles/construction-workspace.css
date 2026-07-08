@@ -219,3 +219,30 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* WBS readability upgrade */
+.cw-grid {
+  min-width: 1880px;
+}
+
+.cw-grid th:nth-child(2),
+.cw-grid td:nth-child(2) {
+  min-width: 430px;
+  max-width: 520px;
+}
+
+.cw-activity-name input {
+  min-width: 400px;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+}
+
+.cw-grid td {
+  height: 62px;
+}
+
+.cw-grid input,
+.cw-grid select {
+  min-height: 42px;
+}
