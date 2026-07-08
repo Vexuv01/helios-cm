@@ -727,3 +727,21 @@
     grid-template-columns: 1fr;
   }
 }
+
+
+.cw-danger-action {
+  border: 1px solid rgba(248, 113, 113, 0.45) !important;
+  background: rgba(127, 29, 29, 0.42) !important;
+  color: #fecaca !important;
+}
+
+.cw-danger-action:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.cw-grid th:first-child,
+.cw-grid td:first-child {
+  min-width: 64px;
+  text-align: center;
+}

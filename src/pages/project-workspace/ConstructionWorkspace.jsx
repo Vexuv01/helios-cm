@@ -51,6 +51,7 @@ export default function ConstructionWorkspace() {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("all");
   const [newActivityCategory, setNewActivityCategory] = useState("CIVIL");
+  const [selectedIds, setSelectedIds] = useState(new Set());
   const [templateProjectId, setTemplateProjectId] = useState("");
 
   const weightedModel = useMemo(() => buildWbsWeightModel(activities), [activities]);
@@ -136,6 +137,7 @@ export default function ConstructionWorkspace() {
       if (!nextProjectId) {
         setActivities([]);
         setDirtyIds(new Set());
+      setSelectedIds(new Set());
         setLoading(false);
         return;
       }
@@ -159,6 +161,28 @@ export default function ConstructionWorkspace() {
   useEffect(() => {
     loadWorkspace();
   }, [loadWorkspace]);
+
+  function toggleSelected(activityId) {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(activityId)) next.delete(activityId);
+      else next.add(activityId);
+      return next;
+    });
+  }
+
+  function toggleAllVisible() {
+    setSelectedIds((current) => {
+      const visibleIds = visibleActivities.map((activity) => activity.id);
+      const allSelected = visibleIds.every((id) => current.has(id));
+
+      if (allSelected) {
+        return new Set([...current].filter((id) => !visibleIds.includes(id)));
+      }
+
+      return new Set([...current, ...visibleIds]);
+    });
+  }
 
   function updateActivity(activityId, field, value) {
     setActivities((current) =>
@@ -229,6 +253,54 @@ export default function ConstructionWorkspace() {
     const { error } = await supabase.from("wbs_activities").delete().eq("id", activity.id);
 
     if (error) alert(error.message);
+    await loadWorkspace(projectId);
+  }
+
+  async function deleteSelectedActivities() {
+    if (selectedIds.size === 0) return;
+
+    const confirmed = window.confirm(
+      `Eliminare ${selectedIds.size} attività selezionate dalla WBS corrente?`
+    );
+
+    if (!confirmed) return;
+
+    const { error } = await supabase
+      .from("wbs_activities")
+      .delete()
+      .in("id", [...selectedIds]);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    await loadWorkspace(projectId);
+  }
+
+  async function deleteAllActivities() {
+    const confirmed = window.confirm(
+      "ATTENZIONE: eliminare TUTTA la WBS del progetto corrente? Questa azione non elimina il progetto."
+    );
+
+    if (!confirmed) return;
+
+    const secondConfirm = window.confirm(
+      "Conferma definitiva: vuoi cancellare tutte le attività WBS di questo progetto?"
+    );
+
+    if (!secondConfirm) return;
+
+    const { error } = await supabase
+      .from("wbs_activities")
+      .delete()
+      .eq("project_id", projectId);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
     await loadWorkspace(projectId);
   }
 
@@ -424,6 +496,14 @@ export default function ConstructionWorkspace() {
         <button type="button" className="cw-secondary-action" onClick={importTemplateIntoCurrentProject}>
           Import WBS into this project
         </button>
+
+        <button type="button" className="cw-danger-action" onClick={deleteSelectedActivities} disabled={selectedIds.size === 0}>
+          Delete selected ({selectedIds.size})
+        </button>
+
+        <button type="button" className="cw-danger-action" onClick={deleteAllActivities}>
+          Delete all WBS
+        </button>
       </section>
 
       <section className="cw-grid-shell excel-shell">
@@ -433,6 +513,13 @@ export default function ConstructionWorkspace() {
           <table className="cw-grid baseline-grid">
             <thead>
               <tr>
+                <th>
+                  <input
+                    type="checkbox"
+                    checked={visibleActivities.length > 0 && visibleActivities.every((activity) => selectedIds.has(activity.id))}
+                    onChange={toggleAllVisible}
+                  />
+                </th>
                 <th>Code</th>
                 <th>Category</th>
                 <th>Activity</th>
@@ -449,6 +536,13 @@ export default function ConstructionWorkspace() {
             <tbody>
               {visibleActivities.map((activity) => (
                 <tr key={activity.id} className={dirtyIds.has(activity.id) ? "cw-row-dirty" : ""}>
+                  <td>
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(activity.id)}
+                      onChange={() => toggleSelected(activity.id)}
+                    />
+                  </td>
                   <td>
                     <input
                       value={activity.code || ""}
