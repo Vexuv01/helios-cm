@@ -3,14 +3,10 @@ import { ProjectProvider } from "../context/ProjectContext";
 import { useProject } from "../context/useProject";
 
 const workspaceTabs = [
-  { label: "Dashboard", path: "dashboard" },
-  { label: "WBS", path: "wbs" },
-  { label: "Weekly", path: "weekly" },
+  { label: "Control Room", path: "dashboard" },
+  { label: "Construction Workspace", path: "wbs" },
+  { label: "Weekly Production", path: "weekly" },
   { label: "Documents", path: "documents" },
-  { label: "Issues", path: "issues" },
-  { label: "Commissioning", path: "commissioning" },
-  { label: "Analytics", path: "analytics" },
-  { label: "Settings", path: "settings" },
 ];
 
 function ProjectWorkspaceShell() {
@@ -43,7 +39,7 @@ function ProjectWorkspaceShell() {
           <Link to="/" className="workspace-back-link">
             ← Portfolio
           </Link>
-          <p className="workspace-eyebrow">Project Workspace</p>
+          <p className="workspace-eyebrow">HELIOS Project Operating System</p>
           <h1>{currentProject?.name}</h1>
           <p className="workspace-subtitle">
             {currentProject?.location || "Location not defined"}
