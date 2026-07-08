@@ -5,13 +5,13 @@ import { buildWbsWeightModel } from "../../services/wbsWeightEngine";
 import "../../styles/construction-workspace.css";
 
 const DEFAULT_CATEGORIES = [
-  "Engineering",
-  "Procurement",
-  "Civil",
-  "Mechanical",
-  "Electrical",
-  "Grid",
-  "Commissioning",
+  "ENGINEERING",
+  "PROCUREMENT",
+  "CIVIL",
+  "MECHANICAL",
+  "ELECTRICAL",
+  "GRID_CONNECTION",
+  "COMMISSIONING",
 ];
 
 function toNumber(value) {
@@ -33,7 +33,7 @@ export default function ConstructionWorkspace() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("all");
-  const [newActivityCategory, setNewActivityCategory] = useState("Civil");
+  const [newActivityCategory, setNewActivityCategory] = useState("CIVIL");
 
   const weightedModel = useMemo(() => buildWbsWeightModel(activities), [activities]);
 
@@ -44,7 +44,7 @@ export default function ConstructionWorkspace() {
 
   const categories = useMemo(() => {
     const fromData = baselineActivities
-      .map((activity) => activity.discipline)
+      .map((activity) => String(activity.discipline || "").trim().toUpperCase())
       .filter(Boolean);
 
     return [...new Set([...DEFAULT_CATEGORIES, ...fromData])];
@@ -260,12 +260,13 @@ export default function ConstructionWorkspace() {
         </select>
 
         <select
+          title="Category for new activity"
           value={newActivityCategory}
           onChange={(event) => setNewActivityCategory(event.target.value)}
         >
           {categories.map((item) => (
             <option key={item} value={item}>
-              New in {item}
+              {item}
             </option>
           ))}
         </select>
