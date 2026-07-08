@@ -25,6 +25,7 @@ function ProjectWorkspaceShell() {
       <main className="workspace-state">
         <h1>Project not available</h1>
         <p>{projectError}</p>
+
         <Link to="/" className="workspace-back-link">
           Back to Portfolio
         </Link>
@@ -39,19 +40,19 @@ function ProjectWorkspaceShell() {
           <Link to="/" className="workspace-back-link">
             ← Portfolio
           </Link>
-          <p className="workspace-eyebrow">HELIOS Project Operating System</p>
+
+          <p className="workspace-eyebrow">
+            HELIOS PROJECT OPERATING SYSTEM
+          </p>
+
           <h1>{currentProject?.name}</h1>
         </div>
-
-        {currentProject?.status && (
-          <div className="workspace-status-card">
-            <span>Status</span>
-            <strong>{currentProject.status}</strong>
-          </div>
-        )}
       </header>
 
-      <nav className="workspace-tabs" aria-label="Project workspace navigation">
+      <nav
+        className="workspace-tabs"
+        aria-label="Project workspace navigation"
+      >
         {workspaceTabs.map((tab) => (
           <NavLink
             key={tab.path}
