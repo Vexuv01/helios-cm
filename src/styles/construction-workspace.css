@@ -715,3 +715,15 @@
 .weight-bad {
   color: #fca5a5;
 }
+
+
+/* WBS template import: final toolbar layout */
+.cw-toolbar {
+  grid-template-columns: 1.4fr 200px 170px 140px 280px 260px;
+}
+
+@media (max-width: 1180px) {
+  .cw-toolbar {
+    grid-template-columns: 1fr;
+  }
+}

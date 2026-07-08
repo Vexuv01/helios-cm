@@ -51,6 +51,7 @@ export default function ConstructionWorkspace() {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("all");
   const [newActivityCategory, setNewActivityCategory] = useState("CIVIL");
+  const [templateProjectId, setTemplateProjectId] = useState("");
 
   const weightedModel = useMemo(() => buildWbsWeightModel(activities), [activities]);
 
@@ -127,6 +128,10 @@ export default function ConstructionWorkspace() {
 
       setProjects(nextProjects);
       setProjectId(nextProjectId);
+
+      if (!templateProjectId) {
+        setTemplateProjectId(nextProjects.find((project) => project.id !== nextProjectId)?.id || "");
+      }
 
       if (!nextProjectId) {
         setActivities([]);
@@ -227,55 +232,82 @@ export default function ConstructionWorkspace() {
     await loadWorkspace(projectId);
   }
 
-  async function importModelToAllProjects() {
-    if (baselineActivities.length === 0) {
-      alert("Nessun modello WBS da importare.");
+  async function importTemplateIntoCurrentProject() {
+    if (!projectId || !templateProjectId) {
+      alert("Seleziona progetto target e progetto modello.");
       return;
     }
 
+    if (projectId === templateProjectId) {
+      alert("Il progetto modello deve essere diverso dal progetto corrente.");
+      return;
+    }
+
+    const sourceProject = projects.find((project) => project.id === templateProjectId);
+    const targetProject = projects.find((project) => project.id === projectId);
+
     const confirmed = window.confirm(
-      "Importare questa WBS su TUTTI gli altri progetti? Le WBS esistenti verranno sostituite. Le date planned start/finish saranno vuote."
+      `Importare la WBS da ${sourceProject?.code || "modello"} dentro ${targetProject?.code || "progetto corrente"}? Le attività esistenti NON saranno cancellate. Le date saranno vuote.`
     );
 
     if (!confirmed) return;
 
     setSaving(true);
 
-    const targetProjects = projects.filter((project) => project.id !== projectId);
+    const { data: sourceRows, error: sourceError } = await supabase
+      .from("wbs_activities")
+      .select("*")
+      .eq("project_id", templateProjectId)
+      .order("sort_order", { ascending: true })
+      .order("code", { ascending: true });
 
-    for (const project of targetProjects) {
-      const deleteResult = await supabase
-        .from("wbs_activities")
-        .delete()
-        .eq("project_id", project.id);
+    if (sourceError) {
+      alert(sourceError.message);
+      setSaving(false);
+      return;
+    }
 
-      if (deleteResult.error) {
-        alert(deleteResult.error.message);
-        setSaving(false);
-        return;
-      }
+    const sourceActivities = (sourceRows || []).filter((row) => row.is_group !== true);
 
-      const templateRows = baselineActivities.map((activity, index) => ({
+    if (sourceActivities.length === 0) {
+      alert("Il progetto modello non contiene attività WBS.");
+      setSaving(false);
+      return;
+    }
+
+    const existingCodes = new Set(
+      activities.map((activity) => String(activity.code || "").trim().toUpperCase())
+    );
+
+    const rowsToInsert = sourceActivities
+      .filter((activity) => !existingCodes.has(String(activity.code || "").trim().toUpperCase()))
+      .map((activity, index) => ({
         ...cleanActivity(activity),
-        project_id: project.id,
+        project_id: projectId,
         planned_start: null,
         planned_finish: null,
         actual_start: null,
         actual_finish: null,
-        sort_order: index + 1,
+        sort_order: activities.length + index + 1,
       }));
 
-      const insertResult = await supabase.from("wbs_activities").insert(templateRows);
+    if (rowsToInsert.length === 0) {
+      alert("Nessuna attività da importare: i codici WBS sono già presenti nel progetto.");
+      setSaving(false);
+      return;
+    }
 
-      if (insertResult.error) {
-        alert(insertResult.error.message);
-        setSaving(false);
-        return;
-      }
+    const { error: insertError } = await supabase.from("wbs_activities").insert(rowsToInsert);
+
+    if (insertError) {
+      alert(insertError.message);
+      setSaving(false);
+      return;
     }
 
     setSaving(false);
-    alert("Template WBS importato su tutti i progetti senza date.");
+    await loadWorkspace(projectId);
+    alert(`Import completato: ${rowsToInsert.length} attività aggiunte senza date.`);
   }
 
   return (
@@ -373,8 +405,24 @@ export default function ConstructionWorkspace() {
         </select>
 
         <button type="button" onClick={addActivity}>+ Activity</button>
-        <button type="button" className="cw-secondary-action" onClick={importModelToAllProjects}>
-          Import model to all projects
+
+        <select
+          title="Source WBS template"
+          value={templateProjectId}
+          onChange={(event) => setTemplateProjectId(event.target.value)}
+        >
+          <option value="">Select WBS model</option>
+          {projects
+            .filter((project) => project.id !== projectId)
+            .map((project) => (
+              <option key={project.id} value={project.id}>
+                Model: {project.code} · {project.name}
+              </option>
+            ))}
+        </select>
+
+        <button type="button" className="cw-secondary-action" onClick={importTemplateIntoCurrentProject}>
+          Import WBS into this project
         </button>
       </section>
 
