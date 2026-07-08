@@ -1,4 +1,5 @@
 import { supabase } from "../lib/supabaseClient";
+import { buildWbsWeightModel } from "./wbsWeightEngine";
 
 function toNumber(value) {
   const parsed = Number(value);
@@ -160,7 +161,9 @@ export async function loadRealConstructionDashboard(projectId) {
       toNumber(actualByActivity[activityId]) + toNumber(entry.actual_quantity);
   }
 
-  const rows = (activities || []).map((activity) => {
+  const weightedModel = buildWbsWeightModel(activities || []);
+
+  const rows = weightedModel.rows.map((activity) => {
     const actual = actualByActivity[activity.id] || 0;
     const baseline = toNumber(activity.baseline_quantity);
     const rowProgress = progress(actual, baseline);
@@ -173,17 +176,22 @@ export async function loadRealConstructionDashboard(projectId) {
     };
   });
 
-  const totalWeight = rows.reduce((sum, row) => sum + toNumber(row.weight_percent), 0) || 1;
+  const operativeRows = rows.filter((row) => row.is_leaf);
 
-  const weightedProgress = rows.reduce(
-    (sum, row) => sum + row.progress * toNumber(row.weight_percent),
+  const totalWeight = operativeRows.reduce(
+    (sum, row) => sum + toNumber(row.real_weight_percent),
+    0
+  ) || 1;
+
+  const weightedProgress = operativeRows.reduce(
+    (sum, row) => sum + row.progress * toNumber(row.real_weight_percent),
     0
   );
 
   const totalProgress = Math.round(weightedProgress / totalWeight);
 
   const disciplines = Object.values(
-    rows.reduce((acc, row) => {
+    operativeRows.reduce((acc, row) => {
       const key = row.discipline || "General";
 
       if (!acc[key]) {
@@ -197,8 +205,8 @@ export async function loadRealConstructionDashboard(projectId) {
         };
       }
 
-      acc[key].weight += toNumber(row.weight_percent);
-      acc[key].weightedProgress += row.progress * toNumber(row.weight_percent);
+      acc[key].weight += toNumber(row.real_weight_percent);
+      acc[key].weightedProgress += row.progress * toNumber(row.real_weight_percent);
       acc[key].activities += 1;
       acc[key].completed += row.progress >= 100 ? 1 : 0;
       acc[key].remaining += toNumber(row.remaining_quantity);
@@ -210,13 +218,13 @@ export async function loadRealConstructionDashboard(projectId) {
     progress: item.weight ? Math.round(item.weightedProgress / item.weight) : 0,
   }));
 
-  const criticalActivities = rows
-    .filter((row) => row.progress < 100 && toNumber(row.weight_percent) >= 3)
-    .sort((a, b) => toNumber(b.weight_percent) - toNumber(a.weight_percent))
+  const criticalActivities = operativeRows
+    .filter((row) => row.progress < 100 && toNumber(row.real_weight_percent) >= 3)
+    .sort((a, b) => toNumber(b.real_weight_percent) - toNumber(a.real_weight_percent))
     .slice(0, 6);
 
-  const blocked = rows.filter((row) => row.status === "blocked").length;
-  const completed = rows.filter((row) => row.progress >= 100).length;
+  const blocked = operativeRows.filter((row) => row.status === "blocked").length;
+  const completed = operativeRows.filter((row) => row.progress >= 100).length;
 
   const curve = buildPlannedActualCurve(rows, weeklyReports || [], entries || []);
   const latestCurvePoint = curve[curve.length - 1] || { planned: 0, actual: 0 };
@@ -250,7 +258,7 @@ export async function loadRealConstructionDashboard(projectId) {
     healthScore,
     completed,
     blocked,
-    totalActivities: rows.length,
+    totalActivities: operativeRows.length,
     disciplines,
     criticalActivities,
     curve,

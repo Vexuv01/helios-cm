@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "../../lib/supabaseClient";
+import { buildWbsWeightModel } from "../../services/wbsWeightEngine";
 import "../../styles/construction-workspace.css";
 
 function toNumber(value) {
@@ -28,9 +29,14 @@ export default function ConstructionWorkspace() {
   const [discipline, setDiscipline] = useState("all");
   const [newParentId, setNewParentId] = useState("");
 
+  const weightedModel = useMemo(() => buildWbsWeightModel(activities), [activities]);
+
+  const weightedActivities = weightedModel.rows;
+  const weightValidation = weightedModel.validation;
+
   const categories = useMemo(
-    () => activities.filter((activity) => isCategory(activity, activities)),
-    [activities]
+    () => weightedActivities.filter((activity) => isCategory(activity, weightedActivities)),
+    [weightedActivities]
   );
 
   const disciplines = useMemo(
@@ -39,7 +45,7 @@ export default function ConstructionWorkspace() {
   );
 
   const visibleActivities = useMemo(() => {
-    return activities.filter((activity) => {
+    return weightedActivities.filter((activity) => {
       const matchSearch =
         !search ||
         activity.code.toLowerCase().includes(search.toLowerCase()) ||
@@ -50,7 +56,7 @@ export default function ConstructionWorkspace() {
 
       return matchSearch && matchDiscipline;
     });
-  }, [activities, discipline, search]);
+  }, [discipline, search, weightedActivities]);
 
   const selectedProject = useMemo(
     () => projects.find((project) => project.id === projectId),
@@ -58,8 +64,8 @@ export default function ConstructionWorkspace() {
   );
 
   const metrics = useMemo(() => {
-    const operational = activities.filter((activity) => !isCategory(activity, activities));
-    const totalWeight = operational.reduce((sum, item) => sum + toNumber(item.weight_percent), 0);
+    const operational = weightedActivities.filter((activity) => activity.is_leaf);
+    const totalWeight = operational.reduce((sum, item) => sum + toNumber(item.real_weight_percent), 0);
     const totalQty = operational.reduce((sum, item) => sum + toNumber(item.baseline_quantity), 0);
 
     return {
@@ -68,7 +74,7 @@ export default function ConstructionWorkspace() {
       totalWeight,
       totalQty,
     };
-  }, [activities, categories.length]);
+  }, [categories.length, weightedActivities]);
 
   const loadWorkspace = useCallback(async () => {
     setLoading(true);
@@ -237,6 +243,15 @@ export default function ConstructionWorkspace() {
         </div>
       </section>
 
+      <section className="weight-validation-strip">
+        {weightValidation.map((item) => (
+          <div key={item.parentId} className={item.ok ? "weight-ok" : "weight-alert"}>
+            <strong>{item.label}</strong>
+            <span>{item.total}%</span>
+          </div>
+        ))}
+      </section>
+
       <section className="cw-toolbar wbs-planning-toolbar">
         <input
           placeholder="Search WBS..."
@@ -270,18 +285,18 @@ export default function ConstructionWorkspace() {
           <table className="cw-grid excel-wbs-grid">
             <thead>
               <tr>
-                <th>Peso L1</th>
-                <th>Peso L2</th>
-                <th>Peso L3</th>
                 <th>Code</th>
-                <th>Fase</th>
                 <th>Activity</th>
+                <th>Level</th>
+                <th>Parent</th>
+                <th>Fase</th>
                 <th>U.M.</th>
                 <th>Quantity</th>
+                <th>Local Weight %</th>
+                <th>Real Weight %</th>
                 <th>Planned Start</th>
                 <th>Planned Finish</th>
                 <th>Status</th>
-                <th>Parent</th>
                 <th>Save</th>
                 <th>Delete</th>
               </tr>
@@ -289,43 +304,39 @@ export default function ConstructionWorkspace() {
 
             <tbody>
               {visibleActivities.map((activity) => {
-                const category = isCategory(activity, activities);
-                const level = getLevel(activity.code);
+                const category = isCategory(activity, weightedActivities);
 
                 return (
                   <tr key={activity.id} className={category ? "excel-category-row" : ""}>
                     <td>
                       <input
-                        type="number"
-                        value={level === 1 ? activity.weight_percent : ""}
-                        onChange={(event) =>
-                          updateActivity(activity.id, "weight_percent", event.target.value)
-                        }
-                      />
-                    </td>
-                    <td>
-                      <input
-                        type="number"
-                        value={level === 2 ? activity.weight_percent : ""}
-                        onChange={(event) =>
-                          updateActivity(activity.id, "weight_percent", event.target.value)
-                        }
-                      />
-                    </td>
-                    <td>
-                      <input
-                        type="number"
-                        value={level >= 3 ? activity.weight_percent : ""}
-                        onChange={(event) =>
-                          updateActivity(activity.id, "weight_percent", event.target.value)
-                        }
-                      />
-                    </td>
-                    <td>
-                      <input
                         value={activity.code}
                         onChange={(event) => updateActivity(activity.id, "code", event.target.value)}
                       />
+                    </td>
+                    <td className={`excel-activity-cell level-${Math.min(activity.level, 3)}`}>
+                      <input
+                        value={activity.name}
+                        onChange={(event) => updateActivity(activity.id, "name", event.target.value)}
+                      />
+                    </td>
+                    <td>
+                      <strong>L{activity.level}</strong>
+                    </td>
+                    <td>
+                      <select
+                        value={activity.parent_id || ""}
+                        onChange={(event) => updateActivity(activity.id, "parent_id", event.target.value)}
+                      >
+                        <option value="">Root</option>
+                        {categories
+                          .filter((categoryItem) => categoryItem.id !== activity.id)
+                          .map((categoryItem) => (
+                            <option key={categoryItem.id} value={categoryItem.id}>
+                              {categoryItem.code} · {categoryItem.name}
+                            </option>
+                          ))}
+                      </select>
                     </td>
                     <td>
                       <input
@@ -333,12 +344,6 @@ export default function ConstructionWorkspace() {
                         onChange={(event) =>
                           updateActivity(activity.id, "discipline", event.target.value)
                         }
-                      />
-                    </td>
-                    <td className={`excel-activity-cell level-${Math.min(level, 3)}`}>
-                      <input
-                        value={activity.name}
-                        onChange={(event) => updateActivity(activity.id, "name", event.target.value)}
                       />
                     </td>
                     <td>
@@ -355,6 +360,18 @@ export default function ConstructionWorkspace() {
                           updateActivity(activity.id, "baseline_quantity", event.target.value)
                         }
                       />
+                    </td>
+                    <td>
+                      <input
+                        type="number"
+                        value={activity.weight_percent}
+                        onChange={(event) =>
+                          updateActivity(activity.id, "weight_percent", event.target.value)
+                        }
+                      />
+                    </td>
+                    <td>
+                      <strong className="real-weight">{activity.real_weight_percent}%</strong>
                     </td>
                     <td>
                       <input
@@ -383,21 +400,6 @@ export default function ConstructionWorkspace() {
                         <option value="in_progress">In progress</option>
                         <option value="blocked">Blocked</option>
                         <option value="completed">Completed</option>
-                      </select>
-                    </td>
-                    <td>
-                      <select
-                        value={activity.parent_id || ""}
-                        onChange={(event) => updateActivity(activity.id, "parent_id", event.target.value)}
-                      >
-                        <option value="">Root</option>
-                        {categories
-                          .filter((categoryItem) => categoryItem.id !== activity.id)
-                          .map((categoryItem) => (
-                            <option key={categoryItem.id} value={categoryItem.id}>
-                              {categoryItem.code} · {categoryItem.name}
-                            </option>
-                          ))}
                       </select>
                     </td>
                     <td>
