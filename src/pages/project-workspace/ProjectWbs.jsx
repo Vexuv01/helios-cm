@@ -7,6 +7,7 @@ import {
   removeWbsActivity,
   saveWbsActivity,
 } from "../../features/wbs/services/wbsService";
+import ActivityDrawer from "../../features/construction-activity/components/ActivityDrawer";
 import "../../styles/wbs.css";
 
 const STATUSES = ["DRAFT", "BASELINE", "IN_PROGRESS", "COMPLETED", "ON_HOLD"];
@@ -60,6 +61,7 @@ export default function ProjectWbs() {
   const [draftRows, setDraftRows] = useState([]);
   const [expanded, setExpanded] = useState({});
   const [savingId, setSavingId] = useState("");
+  const [selectedActivity, setSelectedActivity] = useState(null);
   const [loading, setLoading] = useState(true);
   const [importing, setImporting] = useState(false);
   const [error, setError] = useState("");
@@ -131,6 +133,15 @@ export default function ProjectWbs() {
     setDraftRows((current) =>
       current.map((row) => (row.id === rowId ? { ...row, [field]: value } : row))
     );
+
+    setSelectedActivity((current) =>
+      current?.id === rowId ? { ...current, [field]: value } : current
+    );
+  }
+
+  function updateSelectedActivity(field, value) {
+    if (!selectedActivity) return;
+    updateRow(selectedActivity.id, field, value);
   }
 
   async function saveRow(row) {
@@ -178,6 +189,7 @@ export default function ProjectWbs() {
 
     try {
       await removeWbsActivity(activity.id);
+      if (selectedActivity?.id === activity.id) setSelectedActivity(null);
       await refreshWbs();
     } catch (err) {
       setError(err.message || "Unable to delete WBS activity");
@@ -409,6 +421,14 @@ export default function ProjectWbs() {
                             </td>
                             <td>
                               <div className="wbs-row-actions">
+                                <button
+                                  type="button"
+                                  className="wbs-open-activity"
+                                  onClick={() => setSelectedActivity(activity)}
+                                  disabled={rowSaving}
+                                >
+                                  Open
+                                </button>
                                 <button type="button" onClick={() => saveRow(activity)} disabled={rowSaving}>
                                   {rowSaving ? "Saving" : "Save"}
                                 </button>
@@ -441,6 +461,14 @@ export default function ProjectWbs() {
           ))
         )}
       </section>
+      <ActivityDrawer
+        activity={selectedActivity}
+        onClose={() => setSelectedActivity(null)}
+        onChange={updateSelectedActivity}
+        onSave={saveRow}
+        onDelete={deleteActivity}
+        saving={Boolean(savingId)}
+      />
     </div>
   );
 }
