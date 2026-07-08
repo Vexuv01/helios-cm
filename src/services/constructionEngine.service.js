@@ -29,7 +29,7 @@ export async function loadRealConstructionDashboard(projectId) {
 
   const { data: entries, error: entriesError } = await supabase
     .from("weekly_entries")
-    .select("activity_id, actual_quantity, project_id")
+    .select("activity_id, wbs_activity_id, actual_quantity, project_id")
     .eq("project_id", projectId);
 
   if (entriesError) throw entriesError;
@@ -37,8 +37,8 @@ export async function loadRealConstructionDashboard(projectId) {
   const actualByActivity = {};
 
   for (const entry of entries || []) {
-    actualByActivity[entry.activity_id] =
-      toNumber(actualByActivity[entry.activity_id]) + toNumber(entry.actual_quantity);
+    actualByActivity[(entry.activity_id || entry.wbs_activity_id)] =
+      toNumber(actualByActivity[(entry.activity_id || entry.wbs_activity_id)]) + toNumber(entry.actual_quantity);
   }
 
   const rows = (activities || []).map((activity) => {

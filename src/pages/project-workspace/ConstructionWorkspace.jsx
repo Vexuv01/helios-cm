@@ -130,7 +130,7 @@ export default function ConstructionWorkspace() {
 
     const { data: entryRows, error: entriesError } = await supabase
       .from("weekly_entries")
-      .select("activity_id, actual_quantity, project_id")
+      .select("activity_id, wbs_activity_id, actual_quantity, project_id")
       .eq("project_id", nextProjectId);
 
     if (entriesError) {
@@ -139,8 +139,8 @@ export default function ConstructionWorkspace() {
 
     const actualByActivity = {};
     for (const entry of entryRows || []) {
-      actualByActivity[entry.activity_id] =
-        toNumber(actualByActivity[entry.activity_id]) + toNumber(entry.actual_quantity);
+      actualByActivity[(entry.activity_id || entry.wbs_activity_id)] =
+        toNumber(actualByActivity[(entry.activity_id || entry.wbs_activity_id)]) + toNumber(entry.actual_quantity);
     }
 
     setActivities(
@@ -231,6 +231,7 @@ export default function ConstructionWorkspace() {
       project_id: projectId,
       weekly_report_id: report.id,
       activity_id: row.activity_id,
+      wbs_activity_id: row.activity_id,
       actual_quantity: row.actual_quantity,
     }));
 
