@@ -130,8 +130,8 @@ export default function ConstructionWorkspace() {
 
     const { data: entryRows, error: entriesError } = await supabase
       .from("weekly_entries")
-      .select("activity_id, actual_quantity, weekly_reports!inner(project_id)")
-      .eq("weekly_reports.project_id", nextProjectId);
+      .select("activity_id, actual_quantity, project_id")
+      .eq("project_id", nextProjectId);
 
     if (entriesError) {
       console.error(entriesError);
