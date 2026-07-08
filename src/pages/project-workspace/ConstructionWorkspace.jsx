@@ -25,6 +25,7 @@ export default function ConstructionWorkspace() {
   const { projectId } = useProject();
   const week = getCurrentWeekRange();
 
+  const [mode, setMode] = useState("EXECUTION");
   const [snapshot, setSnapshot] = useState(null);
   const [weekly, setWeekly] = useState(null);
   const [selectedActivity, setSelectedActivity] = useState(null);
@@ -64,7 +65,6 @@ export default function ConstructionWorkspace() {
 
   useEffect(() => {
     const activityId = selectedActivity?.id;
-
     if (!activityId || !weekly?.rows) return;
 
     const row = weekly.rows.find((item) => item.activity.id === activityId);
@@ -79,7 +79,7 @@ export default function ConstructionWorkspace() {
       acc[key].push(activity);
       return acc;
     }, {});
-  }, [snapshot]);
+  }, [snapshot?.activities]);
 
   function selectActivity(activity) {
     setSelectedActivity(activity);
@@ -125,30 +125,53 @@ export default function ConstructionWorkspace() {
     <div className="cw-page">
       <header className="cw-header">
         <div>
-          <span>HELIOS Execution Mode</span>
-          <h2>Construction Operations</h2>
-          <p>Seleziona un'attività, aggiorna produzione settimanale, date reali e note operative.</p>
+          <span>HELIOS Construction Workspace</span>
+          <h2>Activity Command Center</h2>
+          <p>
+            Una sola area operativa: baseline, planning, weekly production,
+            execution status e note di cantiere.
+          </p>
         </div>
-        <strong>{pct(snapshot?.overallProgress)}</strong>
+
+        <div className="cw-header-actions">
+          <strong>{pct(snapshot?.overallProgress)}</strong>
+
+          <div className="cw-mode-toggle">
+            <button
+              type="button"
+              className={mode === "PLANNING" ? "active" : ""}
+              onClick={() => setMode("PLANNING")}
+            >
+              Planning
+            </button>
+            <button
+              type="button"
+              className={mode === "EXECUTION" ? "active" : ""}
+              onClick={() => setMode("EXECUTION")}
+            >
+              Execution
+            </button>
+          </div>
+        </div>
       </header>
 
       <main className="cw-shell">
         <aside className="cw-tree">
           <div className="cw-tree-title">
-            <span>Baseline</span>
-            <h3>Construction Tree</h3>
+            <span>{mode === "PLANNING" ? "Planning Mode" : "Execution Mode"}</span>
+            <h3>WBS Activities</h3>
           </div>
 
           <div className="cw-tree-list">
-            {Object.entries(grouped).map(([discipline, activities]) => (
+            {Object.entries(grouped).map(([discipline, disciplineActivities]) => (
               <section key={discipline} className="cw-tree-group">
                 <div className="cw-tree-group-head">
                   <strong>{discipline}</strong>
-                  <span>{activities.length} activities</span>
+                  <span>{disciplineActivities.length} activities</span>
                 </div>
 
                 <div className="cw-tree-activities">
-                  {activities.map((activity) => (
+                  {disciplineActivities.map((activity) => (
                     <button
                       key={activity.id}
                       type="button"
@@ -173,29 +196,42 @@ export default function ConstructionWorkspace() {
             <>
               <header className="cw-activity-header">
                 <div>
-                  <span>Execution Activity</span>
+                  <span>{mode === "PLANNING" ? "Planning Activity" : "Execution Activity"}</span>
                   <h3>{selectedActivity.name}</h3>
-                  <p>{selectedActivity.code} · {selectedActivity.discipline}</p>
+                  <p>
+                    {selectedActivity.code} · {selectedActivity.discipline} ·{" "}
+                    {selectedActivity.unit}
+                  </p>
                 </div>
 
-                <button type="button" onClick={saveExecution} disabled={saving}>
-                  {saving ? "Saving..." : "Save Execution"}
-                </button>
+                {mode === "EXECUTION" && (
+                  <button type="button" onClick={saveExecution} disabled={saving}>
+                    {saving ? "Saving..." : "Save Execution"}
+                  </button>
+                )}
               </header>
 
               <section className="cw-execution-summary">
                 <article>
                   <span>Baseline</span>
-                  <strong>{n(selectedActivity.baselineQuantity).toFixed(2)} {selectedActivity.unit}</strong>
+                  <strong>
+                    {n(selectedActivity.baselineQuantity).toFixed(2)} {selectedActivity.unit}
+                  </strong>
                 </article>
                 <article>
                   <span>Installed</span>
-                  <strong>{n(selectedActivity.installedQuantity).toFixed(2)} {selectedActivity.unit}</strong>
+                  <strong>
+                    {n(selectedActivity.installedQuantity).toFixed(2)} {selectedActivity.unit}
+                  </strong>
                 </article>
                 <article>
                   <span>Remaining</span>
                   <strong>
-                    {Math.max(n(selectedActivity.baselineQuantity) - n(selectedActivity.installedQuantity), 0).toFixed(2)} {selectedActivity.unit}
+                    {Math.max(
+                      n(selectedActivity.baselineQuantity) - n(selectedActivity.installedQuantity),
+                      0
+                    ).toFixed(2)}{" "}
+                    {selectedActivity.unit}
                   </strong>
                 </article>
                 <article>
@@ -205,73 +241,133 @@ export default function ConstructionWorkspace() {
               </section>
 
               <section className="cw-progress-panel">
-                <span>Execution Progress</span>
+                <span>Activity Progress</span>
                 <strong>{pct(progress(selectedActivity))}</strong>
                 <div>
                   <i style={{ width: `${progress(selectedActivity)}%` }} />
                 </div>
               </section>
 
-              <section className="cw-operational-card">
-                <div className="cw-section-title">
-                  <span>This Week</span>
-                  <h4>Weekly Production</h4>
-                </div>
+              {mode === "PLANNING" ? (
+                <section className="cw-operational-card">
+                  <div className="cw-section-title">
+                    <span>Baseline & Planning</span>
+                    <h4>Planning data</h4>
+                  </div>
 
-                <div className="cw-activity-grid">
-                  <label>
-                    Installed this week
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={weeklyQty}
-                      onChange={(e) => setWeeklyQty(e.target.value)}
-                    />
-                  </label>
+                  <div className="cw-activity-grid">
+                    <label>
+                      Baseline Quantity
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={selectedActivity.baselineQuantity || ""}
+                        onChange={(e) => updateActivity("baselineQuantity", e.target.value)}
+                      />
+                    </label>
 
-                  <label>
-                    Actual Start
-                    <input
-                      type="date"
-                      value={selectedActivity.actualStart || ""}
-                      onChange={(e) => updateActivity("actualStart", e.target.value)}
-                    />
-                  </label>
+                    <label>
+                      Planned Start
+                      <input
+                        type="date"
+                        value={selectedActivity.plannedStart || ""}
+                        onChange={(e) => updateActivity("plannedStart", e.target.value)}
+                      />
+                    </label>
 
-                  <label>
-                    Actual Finish
-                    <input
-                      type="date"
-                      value={selectedActivity.actualFinish || ""}
-                      onChange={(e) => updateActivity("actualFinish", e.target.value)}
-                    />
-                  </label>
+                    <label>
+                      Planned Finish
+                      <input
+                        type="date"
+                        value={selectedActivity.plannedFinish || ""}
+                        onChange={(e) => updateActivity("plannedFinish", e.target.value)}
+                      />
+                    </label>
 
-                  <label>
-                    Status
-                    <select
-                      value={selectedActivity.status || "BASELINE"}
-                      onChange={(e) => updateActivity("status", e.target.value)}
-                    >
-                      <option value="BASELINE">BASELINE</option>
-                      <option value="IN_PROGRESS">IN_PROGRESS</option>
-                      <option value="COMPLETED">COMPLETED</option>
-                      <option value="ON_HOLD">ON_HOLD</option>
-                    </select>
-                  </label>
-                </div>
-              </section>
+                    <label>
+                      Status
+                      <select
+                        value={selectedActivity.status || "BASELINE"}
+                        onChange={(e) => updateActivity("status", e.target.value)}
+                      >
+                        <option value="BASELINE">BASELINE</option>
+                        <option value="IN_PROGRESS">IN_PROGRESS</option>
+                        <option value="COMPLETED">COMPLETED</option>
+                        <option value="ON_HOLD">ON_HOLD</option>
+                      </select>
+                    </label>
+                  </div>
 
-              <section className="cw-notes">
-                <label>
-                  Weekly Notes
-                  <textarea
-                    value={weeklyNotes}
-                    onChange={(e) => setWeeklyNotes(e.target.value)}
-                    placeholder="Note operative, impedimenti, squadre, materiali, decisioni..."
-                  />
-                </label>
-              </section>
+                  <div className="cw-save-inline">
+                    <button type="button" onClick={saveExecution} disabled={saving}>
+                      {saving ? "Saving..." : "Save Planning"}
+                    </button>
+                  </div>
+                </section>
+              ) : (
+                <>
+                  <section className="cw-operational-card">
+                    <div className="cw-section-title">
+                      <span>This Week</span>
+                      <h4>Weekly Production</h4>
+                    </div>
+
+                    <div className="cw-activity-grid">
+                      <label>
+                        Installed this week
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={weeklyQty}
+                          onChange={(e) => setWeeklyQty(e.target.value)}
+                        />
+                      </label>
+
+                      <label>
+                        Actual Start
+                        <input
+                          type="date"
+                          value={selectedActivity.actualStart || ""}
+                          onChange={(e) => updateActivity("actualStart", e.target.value)}
+                        />
+                      </label>
+
+                      <label>
+                        Actual Finish
+                        <input
+                          type="date"
+                          value={selectedActivity.actualFinish || ""}
+                          onChange={(e) => updateActivity("actualFinish", e.target.value)}
+                        />
+                      </label>
+
+                      <label>
+                        Status
+                        <select
+                          value={selectedActivity.status || "BASELINE"}
+                          onChange={(e) => updateActivity("status", e.target.value)}
+                        >
+                          <option value="BASELINE">BASELINE</option>
+                          <option value="IN_PROGRESS">IN_PROGRESS</option>
+                          <option value="COMPLETED">COMPLETED</option>
+                          <option value="ON_HOLD">ON_HOLD</option>
+                        </select>
+                      </label>
+                    </div>
+                  </section>
+
+                  <section className="cw-notes">
+                    <label>
+                      Weekly Notes
+                      <textarea
+                        value={weeklyNotes}
+                        onChange={(e) => setWeeklyNotes(e.target.value)}
+                        placeholder="Note operative, impedimenti, squadre, materiali, decisioni..."
+                      />
+                    </label>
+                  </section>
+                </>
+              )}
             </>
           ) : (
             <p className="cw-empty">Select an activity.</p>
