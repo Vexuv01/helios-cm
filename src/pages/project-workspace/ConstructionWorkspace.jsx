@@ -237,7 +237,7 @@ export default function ConstructionWorkspace() {
 
     const { error: entriesError } = await supabase
       .from("weekly_entries")
-      .upsert(payload, { onConflict: "weekly_report_id,activity_id" });
+      .upsert(payload, { onConflict: "weekly_report_id,wbs_activity_id" });
 
     if (entriesError) {
       setSaving(false);
