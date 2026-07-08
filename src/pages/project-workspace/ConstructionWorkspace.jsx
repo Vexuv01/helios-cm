@@ -8,13 +8,12 @@ function toNumber(value) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function progress(actual, baseline) {
-  if (!baseline) return 0;
-  return Math.min(100, Math.round((actual / baseline) * 100));
-}
-
 function isCategory(activity, allActivities) {
   return allActivities.some((item) => item.parent_id === activity.id) || !activity.code.includes(".");
+}
+
+function getLevel(code = "") {
+  return code.split(".").length;
 }
 
 export default function ConstructionWorkspace() {
@@ -27,16 +26,10 @@ export default function ConstructionWorkspace() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [discipline, setDiscipline] = useState("all");
-  const [status, setStatus] = useState("all");
-  const [newActivityCategoryId, setNewActivityCategoryId] = useState("");
+  const [newParentId, setNewParentId] = useState("");
 
   const categories = useMemo(
     () => activities.filter((activity) => isCategory(activity, activities)),
-    [activities]
-  );
-
-  const operationalActivities = useMemo(
-    () => activities.filter((activity) => !isCategory(activity, activities)),
     [activities]
   );
 
@@ -45,68 +38,37 @@ export default function ConstructionWorkspace() {
     [activities]
   );
 
+  const visibleActivities = useMemo(() => {
+    return activities.filter((activity) => {
+      const matchSearch =
+        !search ||
+        activity.code.toLowerCase().includes(search.toLowerCase()) ||
+        activity.name.toLowerCase().includes(search.toLowerCase()) ||
+        activity.discipline.toLowerCase().includes(search.toLowerCase());
+
+      const matchDiscipline = discipline === "all" || activity.discipline === discipline;
+
+      return matchSearch && matchDiscipline;
+    });
+  }, [activities, discipline, search]);
+
   const selectedProject = useMemo(
     () => projects.find((project) => project.id === projectId),
     [projects, projectId]
   );
 
-  const groupedActivities = useMemo(() => {
-    return categories
-      .map((category) => {
-        const children = operationalActivities.filter((activity) => {
-          const parentMatch = activity.parent_id === category.id;
-          const codeMatch = activity.code?.startsWith(`${category.code}.`);
-          const matchSearch =
-            !search ||
-            activity.code.toLowerCase().includes(search.toLowerCase()) ||
-            activity.name.toLowerCase().includes(search.toLowerCase()) ||
-            category.name.toLowerCase().includes(search.toLowerCase());
-
-          const matchDiscipline = discipline === "all" || activity.discipline === discipline;
-          const matchStatus = status === "all" || activity.status === status;
-
-          return (parentMatch || codeMatch) && matchSearch && matchDiscipline && matchStatus;
-        });
-
-        const weight = children.reduce((sum, item) => sum + toNumber(item.weight_percent), 0);
-        const weightedProgress = children.reduce(
-          (sum, item) =>
-            sum + progress(item.actual_quantity || 0, item.baseline_quantity) * toNumber(item.weight_percent),
-          0
-        );
-
-        return {
-          ...category,
-          children,
-          calculatedWeight: weight,
-          calculatedProgress: weight ? Math.round(weightedProgress / weight) : 0,
-        };
-      })
-      .filter((category) => {
-        if (!search && discipline === "all" && status === "all") return true;
-        return category.children.length > 0;
-      });
-  }, [activities, categories, discipline, operationalActivities, search, status]);
-
   const metrics = useMemo(() => {
-    const totalWeight = operationalActivities.reduce(
-      (sum, activity) => sum + toNumber(activity.weight_percent),
-      0
-    );
-
-    const weightedProgress = operationalActivities.reduce(
-      (sum, activity) =>
-        sum + progress(activity.actual_quantity || 0, activity.baseline_quantity) * toNumber(activity.weight_percent),
-      0
-    );
+    const operational = activities.filter((activity) => !isCategory(activity, activities));
+    const totalWeight = operational.reduce((sum, item) => sum + toNumber(item.weight_percent), 0);
+    const totalQty = operational.reduce((sum, item) => sum + toNumber(item.baseline_quantity), 0);
 
     return {
-      totalProgress: totalWeight ? Math.round(weightedProgress / totalWeight) : 0,
-      totalActivities: operationalActivities.length,
       categories: categories.length,
+      activities: operational.length,
       totalWeight,
+      totalQty,
     };
-  }, [categories.length, operationalActivities]);
+  }, [activities, categories.length]);
 
   const loadWorkspace = useCallback(async () => {
     setLoading(true);
@@ -145,10 +107,10 @@ export default function ConstructionWorkspace() {
   }, [loadWorkspace]);
 
   useEffect(() => {
-    if (!newActivityCategoryId && categories[0]?.id) {
-      setNewActivityCategoryId(categories[0].id);
+    if (!newParentId && categories[0]?.id) {
+      setNewParentId(categories[0].id);
     }
-  }, [categories, newActivityCategoryId]);
+  }, [categories, newParentId]);
 
   function updateActivity(activityId, field, value) {
     setActivities((current) =>
@@ -179,17 +141,17 @@ export default function ConstructionWorkspace() {
   }
 
   async function addActivity() {
-    const category = categories.find((item) => item.id === newActivityCategoryId) || categories[0];
+    const parent = categories.find((category) => category.id === newParentId);
     const maxSort = Math.max(0, ...activities.map((activity) => Number(activity.sort_order || 0)));
-    const count = operationalActivities.filter((activity) => activity.parent_id === category?.id).length;
-    const code = category ? `${category.code}.${String(count + 1).padStart(2, "0")}` : "NEW.01";
+    const children = activities.filter((activity) => activity.parent_id === parent?.id);
+    const code = parent ? `${parent.code}.${String(children.length + 1).padStart(2, "0")}` : "NEW.01";
 
     const { error } = await supabase.from("wbs_activities").insert({
       project_id: projectId,
-      parent_id: category?.id || null,
+      parent_id: parent?.id || null,
       code,
       name: "Nuova attività WBS",
-      discipline: category?.discipline || "General",
+      discipline: parent?.discipline || "General",
       unit: "unit",
       baseline_quantity: 0,
       weight_percent: 0,
@@ -237,7 +199,7 @@ export default function ConstructionWorkspace() {
         <div>
           <span>PM Planning Area</span>
           <h1>WBS Planning</h1>
-          <p>Programmazione baseline: categorie, attività, pesi, quantità e date.</p>
+          <p>Baseline stile Excel: pesi, fasi, quantità e date programmate.</p>
         </div>
 
         <div className="cw-project-select">
@@ -258,26 +220,26 @@ export default function ConstructionWorkspace() {
           <strong>{selectedProject ? `${selectedProject.code} · ${selectedProject.name}` : "—"}</strong>
         </div>
         <div>
-          <span>Planned Progress</span>
-          <strong>{metrics.totalProgress}%</strong>
-        </div>
-        <div>
           <span>Categories</span>
           <strong>{metrics.categories}</strong>
         </div>
         <div>
           <span>Activities</span>
-          <strong>{metrics.totalActivities}</strong>
+          <strong>{metrics.activities}</strong>
         </div>
         <div>
           <span>Total Weight</span>
           <strong>{metrics.totalWeight}</strong>
         </div>
+        <div>
+          <span>Total Qty</span>
+          <strong>{metrics.totalQty}</strong>
+        </div>
       </section>
 
-      <section className="cw-toolbar tree-toolbar">
+      <section className="cw-toolbar wbs-planning-toolbar">
         <input
-          placeholder="Search category or WBS activity..."
+          placeholder="Search WBS..."
           value={search}
           onChange={(event) => setSearch(event.target.value)}
         />
@@ -285,24 +247,11 @@ export default function ConstructionWorkspace() {
         <select value={discipline} onChange={(event) => setDiscipline(event.target.value)}>
           <option value="all">All disciplines</option>
           {disciplines.map((item) => (
-            <option key={item} value={item}>
-              {item}
-            </option>
+            <option key={item} value={item}>{item}</option>
           ))}
         </select>
 
-        <select value={status} onChange={(event) => setStatus(event.target.value)}>
-          <option value="all">All status</option>
-          <option value="not_started">Not started</option>
-          <option value="in_progress">In progress</option>
-          <option value="blocked">Blocked</option>
-          <option value="completed">Completed</option>
-        </select>
-
-        <select
-          value={newActivityCategoryId}
-          onChange={(event) => setNewActivityCategoryId(event.target.value)}
-        >
+        <select value={newParentId} onChange={(event) => setNewParentId(event.target.value)}>
           {categories.map((category) => (
             <option key={category.id} value={category.id}>
               {category.code} · {category.name}
@@ -314,99 +263,158 @@ export default function ConstructionWorkspace() {
         <button type="button" onClick={addActivity}>+ Activity</button>
       </section>
 
-      <section className="cw-grid-shell">
+      <section className="cw-grid-shell excel-shell">
         {loading ? (
           <div className="cw-empty">Loading WBS...</div>
         ) : (
-          <table className="cw-grid cw-tree-grid">
+          <table className="cw-grid excel-wbs-grid">
             <thead>
               <tr>
+                <th>Peso L1</th>
+                <th>Peso L2</th>
+                <th>Peso L3</th>
                 <th>Code</th>
+                <th>Fase</th>
                 <th>Activity</th>
-                <th>Category</th>
-                <th>Discipline</th>
                 <th>U.M.</th>
-                <th>Baseline</th>
-                <th>Weight</th>
-                <th>Start</th>
-                <th>Finish</th>
+                <th>Quantity</th>
+                <th>Planned Start</th>
+                <th>Planned Finish</th>
                 <th>Status</th>
+                <th>Parent</th>
                 <th>Save</th>
                 <th>Delete</th>
               </tr>
             </thead>
 
             <tbody>
-              {groupedActivities.map((category) => (
-                <tr key={category.id} className="cw-category-block">
-                  <td colSpan="12">
-                    <div className="cw-category-title">
-                      <strong>{category.code} · {category.name}</strong>
-                      <span>
-                        Weight {category.calculatedWeight} · Progress {category.calculatedProgress}%
-                      </span>
-                      <button type="button" onClick={() => saveActivity(category)}>Save Category</button>
-                      <button type="button" className="cw-delete-row" onClick={() => deleteActivity(category)}>
+              {visibleActivities.map((activity) => {
+                const category = isCategory(activity, activities);
+                const level = getLevel(activity.code);
+
+                return (
+                  <tr key={activity.id} className={category ? "excel-category-row" : ""}>
+                    <td>
+                      <input
+                        type="number"
+                        value={level === 1 ? activity.weight_percent : ""}
+                        onChange={(event) =>
+                          updateActivity(activity.id, "weight_percent", event.target.value)
+                        }
+                      />
+                    </td>
+                    <td>
+                      <input
+                        type="number"
+                        value={level === 2 ? activity.weight_percent : ""}
+                        onChange={(event) =>
+                          updateActivity(activity.id, "weight_percent", event.target.value)
+                        }
+                      />
+                    </td>
+                    <td>
+                      <input
+                        type="number"
+                        value={level >= 3 ? activity.weight_percent : ""}
+                        onChange={(event) =>
+                          updateActivity(activity.id, "weight_percent", event.target.value)
+                        }
+                      />
+                    </td>
+                    <td>
+                      <input
+                        value={activity.code}
+                        onChange={(event) => updateActivity(activity.id, "code", event.target.value)}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        value={activity.discipline}
+                        onChange={(event) =>
+                          updateActivity(activity.id, "discipline", event.target.value)
+                        }
+                      />
+                    </td>
+                    <td className={`excel-activity-cell level-${Math.min(level, 3)}`}>
+                      <input
+                        value={activity.name}
+                        onChange={(event) => updateActivity(activity.id, "name", event.target.value)}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        value={activity.unit}
+                        onChange={(event) => updateActivity(activity.id, "unit", event.target.value)}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        type="number"
+                        value={activity.baseline_quantity}
+                        onChange={(event) =>
+                          updateActivity(activity.id, "baseline_quantity", event.target.value)
+                        }
+                      />
+                    </td>
+                    <td>
+                      <input
+                        type="date"
+                        value={activity.planned_start || ""}
+                        onChange={(event) =>
+                          updateActivity(activity.id, "planned_start", event.target.value)
+                        }
+                      />
+                    </td>
+                    <td>
+                      <input
+                        type="date"
+                        value={activity.planned_finish || ""}
+                        onChange={(event) =>
+                          updateActivity(activity.id, "planned_finish", event.target.value)
+                        }
+                      />
+                    </td>
+                    <td>
+                      <select
+                        value={activity.status || "not_started"}
+                        onChange={(event) => updateActivity(activity.id, "status", event.target.value)}
+                      >
+                        <option value="not_started">Not started</option>
+                        <option value="in_progress">In progress</option>
+                        <option value="blocked">Blocked</option>
+                        <option value="completed">Completed</option>
+                      </select>
+                    </td>
+                    <td>
+                      <select
+                        value={activity.parent_id || ""}
+                        onChange={(event) => updateActivity(activity.id, "parent_id", event.target.value)}
+                      >
+                        <option value="">Root</option>
+                        {categories
+                          .filter((categoryItem) => categoryItem.id !== activity.id)
+                          .map((categoryItem) => (
+                            <option key={categoryItem.id} value={categoryItem.id}>
+                              {categoryItem.code} · {categoryItem.name}
+                            </option>
+                          ))}
+                      </select>
+                    </td>
+                    <td>
+                      <button type="button" onClick={() => saveActivity(activity)}>Save</button>
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        className="cw-delete-row"
+                        onClick={() => deleteActivity(activity)}
+                      >
                         Delete
                       </button>
-                    </div>
-
-                    <table className="cw-inner-table">
-                      <tbody>
-                        {category.children.map((activity) => (
-                          <tr key={activity.id}>
-                            <td>
-                              <input value={activity.code} onChange={(e) => updateActivity(activity.id, "code", e.target.value)} />
-                            </td>
-                            <td className="cw-activity-name">
-                              <input value={activity.name} onChange={(e) => updateActivity(activity.id, "name", e.target.value)} />
-                            </td>
-                            <td>
-                              <select value={activity.parent_id || category.id} onChange={(e) => updateActivity(activity.id, "parent_id", e.target.value)}>
-                                {categories.map((item) => (
-                                  <option key={item.id} value={item.id}>{item.code} · {item.name}</option>
-                                ))}
-                              </select>
-                            </td>
-                            <td>
-                              <input value={activity.discipline} onChange={(e) => updateActivity(activity.id, "discipline", e.target.value)} />
-                            </td>
-                            <td>
-                              <input value={activity.unit} onChange={(e) => updateActivity(activity.id, "unit", e.target.value)} />
-                            </td>
-                            <td>
-                              <input type="number" value={activity.baseline_quantity} onChange={(e) => updateActivity(activity.id, "baseline_quantity", e.target.value)} />
-                            </td>
-                            <td>
-                              <input type="number" value={activity.weight_percent} onChange={(e) => updateActivity(activity.id, "weight_percent", e.target.value)} />
-                            </td>
-                            <td>
-                              <input type="date" value={activity.planned_start || ""} onChange={(e) => updateActivity(activity.id, "planned_start", e.target.value)} />
-                            </td>
-                            <td>
-                              <input type="date" value={activity.planned_finish || ""} onChange={(e) => updateActivity(activity.id, "planned_finish", e.target.value)} />
-                            </td>
-                            <td>
-                              <select value={activity.status || "not_started"} onChange={(e) => updateActivity(activity.id, "status", e.target.value)}>
-                                <option value="not_started">Not started</option>
-                                <option value="in_progress">In progress</option>
-                                <option value="blocked">Blocked</option>
-                                <option value="completed">Completed</option>
-                              </select>
-                            </td>
-                            <td>
-                              <button type="button" onClick={() => saveActivity(activity)}>Save</button>
-                            </td>
-                            <td>
-                              <button type="button" className="cw-delete-row" onClick={() => deleteActivity(activity)}>Delete</button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}
