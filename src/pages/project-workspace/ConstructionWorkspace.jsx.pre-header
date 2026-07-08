@@ -8,8 +8,6 @@ import {
 } from "../../features/weekly/services/weeklyService";
 import ActivityPhotos from "../../features/construction-photos/ActivityPhotos";
 import ActivityDocuments from "../../features/construction-documents/ActivityDocuments";
-import ActivityHeader from "../../features/construction-workspace/components/ActivityHeader";
-import { buildActivityViewModel } from "../../features/construction-workspace/services/activityViewModel";
 import "../../styles/construction-workspace.css";
 import {
   toNumber as n,
@@ -120,11 +118,6 @@ export default function ConstructionWorkspace() {
   if (loading) return <p className="cw-empty">Loading Construction Workspace...</p>;
   if (error) return <div className="cw-error">{error}</div>;
 
-  const activityVm = selectedActivity
-    ? buildActivityViewModel(selectedActivity, weeklyQty)
-    : null;
-
-
   return (
     <div className="cw-page">
       <header className="cw-header">
@@ -198,14 +191,22 @@ export default function ConstructionWorkspace() {
         <section className="cw-activity">
           {selectedActivity ? (
             <>
-              <ActivityHeader
-                activity={activityVm}
-                health={activityVm.health}
-                mode={mode}
-                saving={saving}
-                onSave={saveExecution}
-                onTabChange={setActivityTab}
-              />
+              <header className="cw-activity-header">
+                <div>
+                  <span>{mode === "PLANNING" ? "Planning Activity" : "Execution Activity"}</span>
+                  <h3>{selectedActivity.name}</h3>
+                  <p>
+                    {selectedActivity.code} · {selectedActivity.discipline} ·{" "}
+                    {selectedActivity.unit}
+                  </p>
+                </div>
+
+                {mode === "EXECUTION" && (
+                  <button type="button" onClick={saveExecution} disabled={saving}>
+                    {saving ? "Saving..." : "Save Execution"}
+                  </button>
+                )}
+              </header>
 
               <section className="cw-execution-summary">
                 <article>
