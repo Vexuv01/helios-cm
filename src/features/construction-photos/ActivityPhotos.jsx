@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   loadActivityPhotos,
   uploadActivityPhoto,
@@ -15,6 +15,11 @@ export default function ActivityPhotos({
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
+
+  const previewUrl = useMemo(() => {
+    if (!file) return "";
+    return URL.createObjectURL(file);
+  }, [file]);
 
   const loadPhotos = useCallback(async () => {
     setLoading(true);
@@ -38,11 +43,22 @@ export default function ActivityPhotos({
     loadPhotos();
   }, [projectId, activityId, loadPhotos]);
 
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
+
+  function handleFileChange(event) {
+    setError("");
+    setFile(event.target.files?.[0] || null);
+  }
+
   async function handleUpload(event) {
     event.preventDefault();
 
     if (!file) {
-      setError("Select a photo before uploading.");
+      setError("Seleziona una foto prima del caricamento.");
       return;
     }
 
@@ -70,19 +86,18 @@ export default function ActivityPhotos({
 
   return (
     <section className="cw-operational-card">
-      <div className="cw-section-title">
-        <span>Construction Photos</span>
-        <h4>Diario fotografico attività</h4>
+      <div className="cw-section-title photos-title">
+        <div>
+          <span>Construction Photos</span>
+          <h4>Diario fotografico attività</h4>
+        </div>
+        <strong>{photos.length} foto</strong>
       </div>
 
-      <form className="photo-upload-form" onSubmit={handleUpload}>
+      <form className="photo-upload-form photo-upload-form-polished" onSubmit={handleUpload}>
         <label>
           Photo
-          <input
-            type="file"
-            accept="image/*"
-            onChange={(event) => setFile(event.target.files?.[0] || null)}
-          />
+          <input type="file" accept="image/*" onChange={handleFileChange} />
         </label>
 
         <label>
@@ -95,31 +110,58 @@ export default function ActivityPhotos({
           />
         </label>
 
-        <button type="submit" disabled={uploading}>
+        <button type="submit" disabled={uploading || !file}>
           {uploading ? "Uploading..." : "Upload Photo"}
         </button>
       </form>
+
+      {previewUrl && (
+        <article className="photo-preview">
+          <img src={previewUrl} alt="Preview upload" />
+          <div>
+            <span>Preview</span>
+            <strong>{file?.name}</strong>
+            <button type="button" onClick={() => setFile(null)} disabled={uploading}>
+              Remove
+            </button>
+          </div>
+        </article>
+      )}
 
       {error && <p className="cw-error">{error}</p>}
 
       {loading ? (
         <p className="cw-placeholder">Loading photos...</p>
       ) : photos.length === 0 ? (
-        <p className="cw-placeholder">
-          Nessuna foto collegata a questa attività.
-        </p>
+        <div className="photo-empty-state">
+          <strong>Nessuna foto collegata</strong>
+          <p>
+            Carica la prima evidenza fotografica per questa attività WBS.
+            Sarà salvata su Supabase Storage e collegata al weekly corrente.
+          </p>
+        </div>
       ) : (
         <div className="photo-grid">
           {photos.map((photo) => (
             <article key={photo.id} className="photo-card">
-              <img src={photo.publicUrl} alt={photo.description || photo.file_name || "Construction"} />
+              <img
+                src={photo.publicUrl}
+                alt={photo.description || photo.file_name || "Construction"}
+              />
               <div>
                 <strong>{photo.description || "Construction photo"}</strong>
                 <span>
                   {photo.taken_at
-                    ? new Date(photo.taken_at).toLocaleDateString("it-IT")
+                    ? new Date(photo.taken_at).toLocaleString("it-IT", {
+                        day: "2-digit",
+                        month: "2-digit",
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })
                     : "No date"}
                 </span>
+                {photo.file_name && <small>{photo.file_name}</small>}
               </div>
             </article>
           ))}
