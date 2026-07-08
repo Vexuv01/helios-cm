@@ -27,6 +27,19 @@ function progress(actual, baseline) {
   return Math.min(100, Math.round((actual / baseline) * 100));
 }
 
+function isCategory(activity, allActivities) {
+  const hasChildren = allActivities.some((item) => item.parent_id === activity.id);
+  const isRootCode = activity.code && !activity.code.includes(".");
+  return hasChildren || isRootCode;
+}
+
+function getActivityParent(activity, categories) {
+  if (activity.parent_id) return activity.parent_id;
+
+  const prefix = activity.code?.split(".")[0];
+  return categories.find((category) => category.code === prefix)?.id || "";
+}
+
 export default function ConstructionWorkspace() {
   const params = useParams();
   const routeProjectId = params.projectId || params.id;
@@ -41,6 +54,7 @@ export default function ConstructionWorkspace() {
   const [search, setSearch] = useState("");
   const [discipline, setDiscipline] = useState("all");
   const [status, setStatus] = useState("all");
+  const [newActivityCategoryId, setNewActivityCategoryId] = useState("");
 
   const week = useMemo(() => getWeekRange(), []);
 
@@ -49,18 +63,52 @@ export default function ConstructionWorkspace() {
     [projects, projectId]
   );
 
-  const visibleActivities = useMemo(() => {
-    return activities.filter((activity) => {
-      const matchSearch =
-        activity.code.toLowerCase().includes(search.toLowerCase()) ||
-        activity.name.toLowerCase().includes(search.toLowerCase());
+  const categories = useMemo(
+    () =>
+      activities
+        .filter((activity) => isCategory(activity, activities))
+        .sort((a, b) => toNumber(a.sort_order) - toNumber(b.sort_order)),
+    [activities]
+  );
 
-      const matchDiscipline = discipline === "all" || activity.discipline === discipline;
-      const matchStatus = status === "all" || activity.status === status;
+  const operationalActivities = useMemo(
+    () => activities.filter((activity) => !isCategory(activity, activities)),
+    [activities]
+  );
 
-      return matchSearch && matchDiscipline && matchStatus;
+  const groupedActivities = useMemo(() => {
+    return categories.map((category) => {
+      const children = operationalActivities
+        .filter((activity) => getActivityParent(activity, categories) === category.id)
+        .filter((activity) => {
+          const matchSearch =
+            activity.code.toLowerCase().includes(search.toLowerCase()) ||
+            activity.name.toLowerCase().includes(search.toLowerCase());
+
+          const matchDiscipline = discipline === "all" || activity.discipline === discipline;
+          const matchStatus = status === "all" || activity.status === status;
+
+          return matchSearch && matchDiscipline && matchStatus;
+        });
+
+      const categoryWeight = children.reduce(
+        (sum, activity) => sum + toNumber(activity.weight_percent),
+        0
+      );
+
+      const weightedProgress = children.reduce((sum, activity) => {
+        const activityProgress = progress(activity.actual_quantity, activity.baseline_quantity);
+        return sum + activityProgress * toNumber(activity.weight_percent);
+      }, 0);
+
+      return {
+        ...category,
+        children,
+        calculatedWeight: categoryWeight,
+        calculatedProgress: categoryWeight ? Math.round(weightedProgress / categoryWeight) : 0,
+      };
     });
-  }, [activities, discipline, search, status]);
+  }, [categories, discipline, operationalActivities, search, status]);
 
   const disciplines = useMemo(
     () => [...new Set(activities.map((activity) => activity.discipline).filter(Boolean))],
@@ -68,12 +116,12 @@ export default function ConstructionWorkspace() {
   );
 
   const metrics = useMemo(() => {
-    const totalWeight = activities.reduce(
+    const totalWeight = operationalActivities.reduce(
       (sum, activity) => sum + toNumber(activity.weight_percent),
       0
     );
 
-    const weightedProgress = activities.reduce((sum, activity) => {
+    const weightedProgress = operationalActivities.reduce((sum, activity) => {
       const activityProgress = progress(activity.actual_quantity, activity.baseline_quantity);
       return sum + activityProgress * toNumber(activity.weight_percent);
     }, 0);
@@ -83,12 +131,12 @@ export default function ConstructionWorkspace() {
 
     return {
       totalProgress,
-      totalActivities: activities.length,
+      totalActivities: operationalActivities.length,
       weeklyTotal,
-      completed: activities.filter((activity) => activity.status === "completed").length,
-      delayed: activities.filter((activity) => activity.status === "blocked").length,
+      completed: operationalActivities.filter((activity) => activity.status === "completed").length,
+      delayed: operationalActivities.filter((activity) => activity.status === "blocked").length,
     };
-  }, [activities, weeklyValues]);
+  }, [operationalActivities, weeklyValues]);
 
   const loadWorkspace = useCallback(async () => {
     setLoading(true);
@@ -139,8 +187,9 @@ export default function ConstructionWorkspace() {
 
     const actualByActivity = {};
     for (const entry of entryRows || []) {
-      actualByActivity[(entry.activity_id || entry.wbs_activity_id)] =
-        toNumber(actualByActivity[(entry.activity_id || entry.wbs_activity_id)]) + toNumber(entry.actual_quantity);
+      const activityId = entry.activity_id || entry.wbs_activity_id;
+      actualByActivity[activityId] =
+        toNumber(actualByActivity[activityId]) + toNumber(entry.actual_quantity);
     }
 
     setActivities(
@@ -158,6 +207,12 @@ export default function ConstructionWorkspace() {
     loadWorkspace();
   }, [loadWorkspace]);
 
+  useEffect(() => {
+    if (!newActivityCategoryId && categories[0]?.id) {
+      setNewActivityCategoryId(categories[0].id);
+    }
+  }, [categories, newActivityCategoryId]);
+
   function updateBaseline(activityId, field, value) {
     setActivities((current) =>
       current.map((activity) =>
@@ -166,16 +221,51 @@ export default function ConstructionWorkspace() {
     );
   }
 
-  async function addActivity() {
+  async function addCategory() {
     if (!projectId) return;
 
     const maxSort = Math.max(0, ...activities.map((activity) => Number(activity.sort_order || 0)));
 
     const { error } = await supabase.from("wbs_activities").insert({
       project_id: projectId,
-      code: "NEW",
-      name: "Nuova attività WBS",
+      parent_id: null,
+      code: "NEW-CAT",
+      name: "Nuova categoria",
       discipline: "General",
+      unit: "lot",
+      baseline_quantity: 0,
+      weight_percent: 0,
+      planned_start: null,
+      planned_finish: null,
+      sort_order: maxSort + 10,
+      status: "not_started",
+    });
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    await loadWorkspace();
+  }
+
+  async function addActivity() {
+    if (!projectId) return;
+
+    const category = categories.find((item) => item.id === newActivityCategoryId) || categories[0];
+    const maxSort = Math.max(0, ...activities.map((activity) => Number(activity.sort_order || 0)));
+    const childrenCount = operationalActivities.filter(
+      (activity) => getActivityParent(activity, categories) === category?.id
+    ).length;
+
+    const nextCode = category ? `${category.code}.${String(childrenCount + 1).padStart(2, "0")}` : "NEW";
+
+    const { error } = await supabase.from("wbs_activities").insert({
+      project_id: projectId,
+      parent_id: category?.id || null,
+      code: nextCode,
+      name: "Nuova attività WBS",
+      discipline: category?.discipline || "General",
       unit: "unit",
       baseline_quantity: 0,
       weight_percent: 0,
@@ -194,14 +284,13 @@ export default function ConstructionWorkspace() {
   }
 
   async function deleteActivity(activity) {
-    const confirmed = window.confirm(`Eliminare definitivamente questa attività?\n\n${activity.code} · ${activity.name}`);
+    const confirmed = window.confirm(
+      `Eliminare definitivamente questa voce WBS?\n\n${activity.code} · ${activity.name}`
+    );
 
     if (!confirmed) return;
 
-    const { error } = await supabase
-      .from("wbs_activities")
-      .delete()
-      .eq("id", activity.id);
+    const { error } = await supabase.from("wbs_activities").delete().eq("id", activity.id);
 
     if (error) {
       alert(error.message);
@@ -215,6 +304,7 @@ export default function ConstructionWorkspace() {
     const { error } = await supabase
       .from("wbs_activities")
       .update({
+        parent_id: activity.parent_id || null,
         code: activity.code,
         name: activity.name,
         discipline: activity.discipline,
@@ -300,9 +390,7 @@ export default function ConstructionWorkspace() {
         <div>
           <span>HELIOS CM Enterprise</span>
           <h1>Construction Operating Grid</h1>
-          <p>
-            WBS reale, quantità weekly, avanzamento automatico e salvataggio Supabase.
-          </p>
+          <p>WBS ad albero, attività per categoria, weekly e progress reale.</p>
         </div>
 
         <div className="cw-project-select">
@@ -340,7 +428,7 @@ export default function ConstructionWorkspace() {
         </div>
       </section>
 
-      <section className="cw-toolbar">
+      <section className="cw-toolbar tree-toolbar">
         <input
           placeholder="Search WBS activity..."
           value={search}
@@ -364,8 +452,23 @@ export default function ConstructionWorkspace() {
           <option value="completed">Completed</option>
         </select>
 
+        <select
+          value={newActivityCategoryId}
+          onChange={(event) => setNewActivityCategoryId(event.target.value)}
+        >
+          {categories.map((category) => (
+            <option key={category.id} value={category.id}>
+              {category.code} · {category.name}
+            </option>
+          ))}
+        </select>
+
+        <button type="button" onClick={addCategory}>
+          + Category
+        </button>
+
         <button type="button" onClick={addActivity}>
-          + Add WBS Activity
+          + Activity
         </button>
 
         <button type="button" onClick={saveWeekly} disabled={saving}>
@@ -377,11 +480,12 @@ export default function ConstructionWorkspace() {
         {loading ? (
           <div className="cw-empty">Loading real WBS...</div>
         ) : (
-          <table className="cw-grid">
+          <table className="cw-grid cw-tree-grid">
             <thead>
               <tr>
                 <th>Code</th>
                 <th>Activity</th>
+                <th>Category</th>
                 <th>Discipline</th>
                 <th>U.M.</th>
                 <th>Baseline</th>
@@ -399,115 +503,46 @@ export default function ConstructionWorkspace() {
             </thead>
 
             <tbody>
-              {visibleActivities.map((activity) => {
-                const weeklyQty = toNumber(weeklyValues[activity.id] || 0);
-                const actual = toNumber(activity.actual_quantity);
-                const baseline = toNumber(activity.baseline_quantity);
-                const remaining = Math.max(0, baseline - actual - weeklyQty);
-                const rowProgress = progress(actual + weeklyQty, baseline);
-
-                return (
-                  <tr key={activity.id}>
+              {groupedActivities.map((category) => (
+                <>
+                  <tr key={category.id} className="cw-category-row">
                     <td>
                       <input
-                        value={activity.code}
-                        onChange={(event) => updateBaseline(activity.id, "code", event.target.value)}
+                        value={category.code}
+                        onChange={(event) => updateBaseline(category.id, "code", event.target.value)}
                       />
                     </td>
-                    <td className="cw-activity-name">
+                    <td className="cw-activity-name cw-category-name">
                       <input
-                        value={activity.name}
-                        onChange={(event) => updateBaseline(activity.id, "name", event.target.value)}
+                        value={category.name}
+                        onChange={(event) => updateBaseline(category.id, "name", event.target.value)}
                       />
                     </td>
+                    <td>Root</td>
                     <td>
                       <input
-                        value={activity.discipline}
+                        value={category.discipline}
                         onChange={(event) =>
-                          updateBaseline(activity.id, "discipline", event.target.value)
+                          updateBaseline(category.id, "discipline", event.target.value)
                         }
                       />
                     </td>
+                    <td>{category.unit}</td>
+                    <td>—</td>
+                    <td>—</td>
+                    <td>—</td>
+                    <td>—</td>
                     <td>
-                      <input
-                        value={activity.unit}
-                        onChange={(event) => updateBaseline(activity.id, "unit", event.target.value)}
-                      />
+                      <strong>{category.calculatedProgress}%</strong>
                     </td>
                     <td>
-                      <input
-                        type="number"
-                        value={activity.baseline_quantity}
-                        onChange={(event) =>
-                          updateBaseline(activity.id, "baseline_quantity", event.target.value)
-                        }
-                      />
+                      <strong>{category.calculatedWeight}</strong>
                     </td>
-                    <td>{actual}</td>
+                    <td>{category.planned_start || "—"}</td>
+                    <td>{category.planned_finish || "—"}</td>
+                    <td>{category.status}</td>
                     <td>
-                      <input
-                        className="cw-weekly-input"
-                        type="number"
-                        value={weeklyValues[activity.id] || ""}
-                        onChange={(event) =>
-                          setWeeklyValues((current) => ({
-                            ...current,
-                            [activity.id]: event.target.value,
-                          }))
-                        }
-                      />
-                    </td>
-                    <td>{remaining}</td>
-                    <td>
-                      <div className="cw-progress-cell">
-                        <span>{rowProgress}%</span>
-                        <div>
-                          <i style={{ width: `${rowProgress}%` }} />
-                        </div>
-                      </div>
-                    </td>
-                    <td>
-                      <input
-                        type="number"
-                        value={activity.weight_percent}
-                        onChange={(event) =>
-                          updateBaseline(activity.id, "weight_percent", event.target.value)
-                        }
-                      />
-                    </td>
-                    <td>
-                      <input
-                        type="date"
-                        value={activity.planned_start || ""}
-                        onChange={(event) =>
-                          updateBaseline(activity.id, "planned_start", event.target.value)
-                        }
-                      />
-                    </td>
-                    <td>
-                      <input
-                        type="date"
-                        value={activity.planned_finish || ""}
-                        onChange={(event) =>
-                          updateBaseline(activity.id, "planned_finish", event.target.value)
-                        }
-                      />
-                    </td>
-                    <td>
-                      <select
-                        value={activity.status || "not_started"}
-                        onChange={(event) =>
-                          updateBaseline(activity.id, "status", event.target.value)
-                        }
-                      >
-                        <option value="not_started">Not started</option>
-                        <option value="in_progress">In progress</option>
-                        <option value="blocked">Blocked</option>
-                        <option value="completed">Completed</option>
-                      </select>
-                    </td>
-                    <td>
-                      <button type="button" onClick={() => saveBaseline(activity)}>
+                      <button type="button" onClick={() => saveBaseline(category)}>
                         Save
                       </button>
                     </td>
@@ -515,14 +550,159 @@ export default function ConstructionWorkspace() {
                       <button
                         type="button"
                         className="cw-delete-row"
-                        onClick={() => deleteActivity(activity)}
+                        onClick={() => deleteActivity(category)}
                       >
                         Delete
                       </button>
                     </td>
                   </tr>
-                );
-              })}
+
+                  {category.children.map((activity) => {
+                    const weeklyQty = toNumber(weeklyValues[activity.id] || 0);
+                    const actual = toNumber(activity.actual_quantity);
+                    const baseline = toNumber(activity.baseline_quantity);
+                    const remaining = Math.max(0, baseline - actual - weeklyQty);
+                    const rowProgress = progress(actual + weeklyQty, baseline);
+
+                    return (
+                      <tr key={activity.id}>
+                        <td>
+                          <input
+                            value={activity.code}
+                            onChange={(event) =>
+                              updateBaseline(activity.id, "code", event.target.value)
+                            }
+                          />
+                        </td>
+                        <td className="cw-activity-name cw-child-name">
+                          <input
+                            value={activity.name}
+                            onChange={(event) =>
+                              updateBaseline(activity.id, "name", event.target.value)
+                            }
+                          />
+                        </td>
+                        <td>
+                          <select
+                            value={getActivityParent(activity, categories)}
+                            onChange={(event) =>
+                              updateBaseline(activity.id, "parent_id", event.target.value)
+                            }
+                          >
+                            {categories.map((item) => (
+                              <option key={item.id} value={item.id}>
+                                {item.code} · {item.name}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td>
+                          <input
+                            value={activity.discipline}
+                            onChange={(event) =>
+                              updateBaseline(activity.id, "discipline", event.target.value)
+                            }
+                          />
+                        </td>
+                        <td>
+                          <input
+                            value={activity.unit}
+                            onChange={(event) =>
+                              updateBaseline(activity.id, "unit", event.target.value)
+                            }
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="number"
+                            value={activity.baseline_quantity}
+                            onChange={(event) =>
+                              updateBaseline(activity.id, "baseline_quantity", event.target.value)
+                            }
+                          />
+                        </td>
+                        <td>{actual}</td>
+                        <td>
+                          <input
+                            className="cw-weekly-input"
+                            type="number"
+                            value={weeklyValues[activity.id] || ""}
+                            onChange={(event) =>
+                              setWeeklyValues((current) => ({
+                                ...current,
+                                [activity.id]: event.target.value,
+                              }))
+                            }
+                          />
+                        </td>
+                        <td>{remaining}</td>
+                        <td>
+                          <div className="cw-progress-cell">
+                            <span>{rowProgress}%</span>
+                            <div>
+                              <i style={{ width: `${rowProgress}%` }} />
+                            </div>
+                          </div>
+                        </td>
+                        <td>
+                          <input
+                            type="number"
+                            value={activity.weight_percent}
+                            onChange={(event) =>
+                              updateBaseline(activity.id, "weight_percent", event.target.value)
+                            }
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="date"
+                            value={activity.planned_start || ""}
+                            onChange={(event) =>
+                              updateBaseline(activity.id, "planned_start", event.target.value)
+                            }
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="date"
+                            value={activity.planned_finish || ""}
+                            onChange={(event) =>
+                              updateBaseline(activity.id, "planned_finish", event.target.value)
+                            }
+                          />
+                        </td>
+                        <td>
+                          <select
+                            value={activity.status || "not_started"}
+                            onChange={(event) =>
+                              updateBaseline(activity.id, "status", event.target.value)
+                            }
+                          >
+                            <option value="not_started">Not started</option>
+                            <option value="in_progress">In progress</option>
+                            <option value="blocked">Blocked</option>
+                            <option value="completed">Completed</option>
+                          </select>
+                        </td>
+                        <td>
+                          <button type="button" onClick={() => saveBaseline(activity)}>
+                            Save
+                          </button>
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            className="cw-delete-row"
+                            onClick={() => deleteActivity(activity)}
+                          >
+                            Delete
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </>
+              ))}
             </tbody>
           </table>
         )}

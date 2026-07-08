@@ -255,3 +255,50 @@
 .cw-delete-row:hover {
   background: rgba(239, 68, 68, 0.42) !important;
 }
+
+.tree-toolbar {
+  grid-template-columns: 1.4fr 190px 170px 250px 140px 140px 220px;
+}
+
+.cw-tree-grid {
+  min-width: 2180px;
+}
+
+.cw-category-row td {
+  background: rgba(37, 99, 235, 0.22) !important;
+  border-top: 1px solid rgba(96, 165, 250, 0.35);
+  border-bottom: 1px solid rgba(96, 165, 250, 0.35);
+}
+
+.cw-category-row input {
+  font-weight: 900;
+  background: rgba(15, 23, 42, 0.55);
+}
+
+.cw-category-name input {
+  font-size: 15px;
+  text-transform: uppercase;
+}
+
+.cw-child-name input {
+  padding-left: 28px;
+}
+
+.cw-child-name::before {
+  content: "↳";
+  position: absolute;
+  margin-left: 10px;
+  margin-top: 13px;
+  color: #60a5fa;
+  font-weight: 900;
+}
+
+.cw-tree-grid td:nth-child(2) {
+  position: sticky;
+}
+
+@media (max-width: 1180px) {
+  .tree-toolbar {
+    grid-template-columns: 1fr;
+  }
+}
