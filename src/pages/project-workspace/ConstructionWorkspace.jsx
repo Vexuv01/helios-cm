@@ -6,6 +6,7 @@ import {
   loadWeeklyWorkspace,
   saveWeeklyQuantity,
 } from "../../features/weekly/services/weeklyService";
+import ActivityPhotos from "../../features/construction-photos/ActivityPhotos";
 import "../../styles/construction-workspace.css";
 
 function n(value) {
@@ -265,18 +266,28 @@ export default function ConstructionWorkspace() {
                 </section>
               )}
 
-              {activityTab !== "OVERVIEW" && activityTab !== "WEEKLY" && (
-                <section className="cw-operational-card">
-                  <div className="cw-section-title">
-                    <span>{activityTab}</span>
-                    <h4>{activityTab.toLowerCase()} workspace</h4>
-                  </div>
-                  <p className="cw-placeholder">
-                    Sezione pronta per Sprint successivo. Sarà collegata ad attività WBS,
-                    Weekly Report e Supabase.
-                  </p>
-                </section>
+              {activityTab === "PHOTOS" && (
+                <ActivityPhotos
+                  projectId={projectId}
+                  activityId={selectedActivity.id}
+                  weeklyReportId={weekly?.report?.id}
+                />
               )}
+
+              {activityTab !== "OVERVIEW" &&
+                activityTab !== "WEEKLY" &&
+                activityTab !== "PHOTOS" && (
+                  <section className="cw-operational-card">
+                    <div className="cw-section-title">
+                      <span>{activityTab}</span>
+                      <h4>{activityTab.toLowerCase()} workspace</h4>
+                    </div>
+                    <p className="cw-placeholder">
+                      Sezione pronta per Sprint successivo. Sarà collegata ad attività WBS,
+                      Weekly Report e Supabase.
+                    </p>
+                  </section>
+                )}
 
               {(activityTab === "OVERVIEW" || activityTab === "WEEKLY") && mode === "PLANNING" ? (
                 <section className="cw-operational-card">
