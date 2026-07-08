@@ -47,25 +47,30 @@ export default function ConstructionWorkspace() {
       setSnapshot(wbsData);
       setWeekly(weeklyData);
 
-      const activity = selectedActivity
-        ? wbsData.activities.find((item) => item.id === selectedActivity.id)
-        : wbsData.activities?.[0];
-
-      setSelectedActivity(activity || null);
-
-      const row = weeklyData.rows.find((item) => item.activity.id === activity?.id);
-      setWeeklyQty(row?.quantityThisWeek || 0);
-      setWeeklyNotes(row?.notes || "");
+      setSelectedActivity((current) => {
+        if (!current) return wbsData.activities?.[0] || null;
+        return wbsData.activities.find((item) => item.id === current.id) || wbsData.activities?.[0] || null;
+      });
     } catch (err) {
       setError(err.message || "Unable to load workspace");
     } finally {
       setLoading(false);
     }
-  }, [projectId, selectedActivity?.id, week.weekEnd, week.weekStart]);
+  }, [projectId, week.weekEnd, week.weekStart]);
 
   useEffect(() => {
     loadWorkspace();
   }, [loadWorkspace]);
+
+  useEffect(() => {
+    const activityId = selectedActivity?.id;
+
+    if (!activityId || !weekly?.rows) return;
+
+    const row = weekly.rows.find((item) => item.activity.id === activityId);
+    setWeeklyQty(row?.quantityThisWeek || 0);
+    setWeeklyNotes(row?.notes || "");
+  }, [selectedActivity?.id, weekly?.rows]);
 
   const grouped = useMemo(() => {
     return (snapshot?.activities || []).reduce((acc, activity) => {
