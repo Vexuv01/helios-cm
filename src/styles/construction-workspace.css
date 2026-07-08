@@ -592,3 +592,115 @@
 .photo-lightbox-content > button {
   display: none;
 }
+
+.document-upload-form {
+  display: grid;
+  grid-template-columns: 1fr 160px 1fr 1fr auto;
+  gap: 14px;
+  align-items: end;
+  margin-top: 18px;
+}
+
+.document-upload-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.document-upload-form input,
+.document-upload-form select {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.22);
+  color: inherit;
+  outline: none;
+}
+
+.document-upload-form button,
+.photo-lightbox-actions a {
+  border: 0;
+  border-radius: 14px;
+  padding: 12px 16px;
+  font-weight: 900;
+  cursor: pointer;
+  color: #111827;
+  background: #ffffff;
+  text-decoration: none;
+}
+
+.document-upload-form button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.document-selected {
+  margin: 12px 0 0;
+  color: var(--muted);
+}
+
+.document-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.document-card button {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  width: 100%;
+  text-align: left;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  padding: 16px;
+  color: inherit;
+  background: rgba(255, 255, 255, 0.055);
+  cursor: pointer;
+}
+
+.document-card span,
+.document-card small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.document-card strong {
+  display: block;
+  margin: 6px 0;
+}
+
+.document-lightbox-content {
+  width: min(900px, 96vw);
+  max-height: 90vh;
+  overflow: auto;
+  border-radius: 24px;
+  background: #111827;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.document-preview-box {
+  padding: 24px;
+}
+
+.document-preview-box span,
+.document-preview-box small {
+  display: block;
+  color: var(--muted);
+}
+
+.document-preview-box h3 {
+  margin: 8px 0;
+}
+
+@media (max-width: 1100px) {
+  .document-upload-form {
+    grid-template-columns: 1fr;
+  }
+}
