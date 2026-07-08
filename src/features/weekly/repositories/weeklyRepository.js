@@ -111,3 +111,17 @@ export async function updateWbsInstalledQuantity(activityId, installedQuantity) 
   assertResult(result);
   return installedQuantity;
 }
+
+export async function updateWeeklyReportStatus(reportId, status) {
+  const result = await supabase
+    .from("weekly_reports")
+    .update({
+      status,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", reportId)
+    .select("*")
+    .single();
+
+  return fromReportDb(assertResult(result));
+}
