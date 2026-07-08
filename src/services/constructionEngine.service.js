@@ -9,15 +9,41 @@ function round(value, digits = 1) {
   return Number(n(value).toFixed(digits));
 }
 
+function pick(row, ...keys) {
+  for (const key of keys) {
+    if (row?.[key] !== undefined && row?.[key] !== null && row?.[key] !== "") return row[key];
+  }
+  return null;
+}
+
 function parseDate(value) {
   if (!value) return null;
-  const date = new Date(`${value}T00:00:00`);
+  const raw = String(value).slice(0, 10);
+  const date = new Date(`${raw}T00:00:00`);
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+function getStart(activity) {
+  return parseDate(pick(activity, "planned_start", "plannedStart"));
+}
+
+function getFinish(activity) {
+  return parseDate(pick(activity, "planned_finish", "plannedFinish"));
+}
+
+function getPlannedWindow(activity) {
+  const start = getStart(activity);
+  const finish = getFinish(activity);
+
+  if (start && finish) return { start, finish };
+  if (start && !finish) return { start, finish: start };
+  if (!start && finish) return { start: finish, finish };
+
+  return { start: null, finish: null };
+}
+
 function plannedProgress(activity, today = new Date()) {
-  const start = parseDate(activity.planned_start);
-  const finish = parseDate(activity.planned_finish);
+  const { start, finish } = getPlannedWindow(activity);
 
   if (!start || !finish) return 0;
   if (today < start) return 0;
@@ -66,9 +92,9 @@ async function loadWeeklyEntries(reportIds) {
   if (reportIds.length === 0) return [];
 
   const attempts = [
-    async () => supabase.from("weekly_entries").select("*").in("weekly_report_id", reportIds),
-    async () => supabase.from("weekly_production").select("*").in("weekly_report_id", reportIds),
-    async () => supabase.from("weekly_activities").select("*").in("weekly_report_id", reportIds),
+    () => supabase.from("weekly_entries").select("*").in("weekly_report_id", reportIds),
+    () => supabase.from("weekly_production").select("*").in("weekly_report_id", reportIds),
+    () => supabase.from("weekly_activities").select("*").in("weekly_report_id", reportIds),
   ];
 
   for (const attempt of attempts) {
@@ -123,11 +149,15 @@ export async function loadRealConstructionDashboard(projectId) {
   const today = new Date();
 
   const enriched = activities.map((activity) => {
-    const baseline = n(activity.baseline_quantity);
+    const baseline = n(activity.baseline_quantity ?? activity.baselineQuantity);
     const installed = n(actualMap[activity.id]);
+    const weight = n(activity.weight_percent ?? activity.weightPercent);
+    const start = getStart(activity);
+    const finish = getFinish(activity);
+    const { start: effectiveStart, finish: effectiveFinish } = getPlannedWindow(activity);
+
     const actualProgress = baseline > 0 ? Math.min((installed / baseline) * 100, 100) : 0;
     const planned = plannedProgress(activity, today);
-    const weight = n(activity.weight_percent);
 
     return {
       id: activity.id,
@@ -143,10 +173,14 @@ export async function loadRealConstructionDashboard(projectId) {
       plannedWeight: (planned / 100) * weight,
       variance: actualProgress - planned,
       status: activity.status,
-      plannedStart: activity.planned_start,
-      plannedFinish: activity.planned_finish,
-      hasDates: Boolean(activity.planned_start && activity.planned_finish),
+      plannedStart: pick(activity, "planned_start", "plannedStart"),
+      plannedFinish: pick(activity, "planned_finish", "plannedFinish"),
+      hasStart: Boolean(start),
+      hasFinish: Boolean(finish),
+      hasFullDates: Boolean(start && finish),
+      isSchedulable: Boolean(effectiveStart && effectiveFinish),
       hasWeight: weight > 0,
+      startedByToday: Boolean(effectiveStart && effectiveStart <= today),
     };
   });
 
@@ -157,13 +191,6 @@ export async function loadRealConstructionDashboard(projectId) {
   const actualProgress = totalWeight > 0 ? round((earnedWeight / totalWeight) * 100) : 0;
   const plannedProgressValue = totalWeight > 0 ? round((plannedWeight / totalWeight) * 100) : 0;
   const scheduleGap = round(actualProgress - plannedProgressValue);
-
-  const activitiesWithDates = enriched.filter((item) => item.hasDates).length;
-  const activitiesWithWeight = enriched.filter((item) => item.hasWeight).length;
-  const activitiesStartedByToday = enriched.filter((item) => {
-    const start = parseDate(item.plannedStart);
-    return start && start <= today;
-  }).length;
 
   const criticalActivities = enriched
     .filter((item) => item.plannedProgress >= 20 && item.actualProgress < item.plannedProgress - 10)
@@ -215,7 +242,6 @@ export async function loadRealConstructionDashboard(projectId) {
     blocked,
     criticalActivities,
     disciplines,
-
     curve: buildCurve({ plannedProgressValue, actualProgress }),
 
     weightDistribution: disciplines.map((item) => ({
@@ -235,9 +261,12 @@ export async function loadRealConstructionDashboard(projectId) {
       actualSource: "Weekly only",
       plannedSource: "WBS dates + WBS weight",
       wbsActivities: activities.length,
-      activitiesWithDates,
-      activitiesWithWeight,
-      activitiesStartedByToday,
+      activitiesWithDates: enriched.filter((item) => item.hasFullDates).length,
+      schedulableActivities: enriched.filter((item) => item.isSchedulable).length,
+      activitiesWithStart: enriched.filter((item) => item.hasStart).length,
+      activitiesWithFinish: enriched.filter((item) => item.hasFinish).length,
+      activitiesWithWeight: enriched.filter((item) => item.hasWeight).length,
+      activitiesStartedByToday: enriched.filter((item) => item.startedByToday).length,
       totalWeight: round(totalWeight, 2),
       weeklyReports: reports.length,
       weeklyEntries: entries.length,

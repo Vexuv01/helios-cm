@@ -196,14 +196,14 @@ export default function ProjectDashboard() {
 
             <div className="hero-kpi">
               <span>Planned Source</span>
-              <strong>{dashboard.dataSource.activitiesWithDates}/{dashboard.dataSource.wbsActivities}</strong>
-              <small>Activities with planned dates</small>
+              <strong>{dashboard.dataSource.schedulableActivities}/{dashboard.dataSource.wbsActivities}</strong>
+              <small>Schedulable activities · full dates {dashboard.dataSource.activitiesWithDates}</small>
             </div>
 
             <div className="hero-kpi">
               <span>Started by Today</span>
               <strong>{dashboard.dataSource.activitiesStartedByToday}</strong>
-              <small>{dashboard.dataSource.today}</small>
+              <small>Start {dashboard.dataSource.activitiesWithStart} · Finish {dashboard.dataSource.activitiesWithFinish}</small>
             </div>
 
             <div className="hero-kpi">
