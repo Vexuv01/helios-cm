@@ -1,4 +1,5 @@
 import { useState } from "react";
+import ConstructionTree from "../../features/construction-workspace/components/ConstructionTree";
 import ProjectWbs from "./ProjectWbs";
 import ProjectWeekly from "./ProjectWeekly";
 import "../../styles/construction-workspace.css";
@@ -23,6 +24,8 @@ export default function ConstructionWorkspace() {
           </p>
         </div>
       </header>
+
+      <ConstructionTree />
 
       <nav className="construction-workspace-tabs">
         {WORKSPACE_TABS.map((tab) => (
