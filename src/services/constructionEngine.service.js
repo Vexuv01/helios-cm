@@ -1,269 +1,268 @@
 import { supabase } from "../lib/supabaseClient";
-import { buildWbsWeightModel } from "./wbsWeightEngine";
 
-function toNumber(value) {
+function n(value) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function progress(actual, baseline) {
-  if (!baseline) return 0;
-  return Math.min(100, Math.round((actual / baseline) * 100));
+function round(value, digits = 1) {
+  return Number(n(value).toFixed(digits));
 }
 
-function dateValue(date) {
-  return date ? new Date(date).getTime() : null;
+function parseDate(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
 }
 
-function addDays(date, days) {
-  const next = new Date(date);
-  next.setDate(next.getDate() + days);
-  return next;
+function plannedProgress(activity, today = new Date()) {
+  const start = parseDate(activity.planned_start);
+  const finish = parseDate(activity.planned_finish);
+
+  if (!start || !finish) return 0;
+  if (today < start) return 0;
+  if (today >= finish) return 100;
+
+  const total = finish.getTime() - start.getTime();
+  const elapsed = today.getTime() - start.getTime();
+
+  if (total <= 0) return 100;
+
+  return Math.min(Math.max((elapsed / total) * 100, 0), 100);
 }
 
-function formatWeek(date) {
-  return date.toISOString().slice(5, 10);
+function projectLocation(project) {
+  return [project?.municipality, project?.province, project?.region].filter(Boolean).join(" · ");
 }
 
-function buildPlannedActualCurve(rows, weeklyReports, entries) {
-  const validDates = rows
-    .flatMap((row) => [row.planned_start, row.planned_finish])
-    .filter(Boolean)
-    .map((date) => new Date(date));
-
-  if (!validDates.length) return [];
-
-  const minDate = new Date(Math.min(...validDates.map((date) => date.getTime())));
-  const maxDate = new Date(Math.max(...validDates.map((date) => date.getTime())));
-  const totalWeight = rows.reduce((sum, row) => sum + toNumber(row.weight_percent), 0) || 1;
-
-  const reportById = Object.fromEntries((weeklyReports || []).map((report) => [report.id, report]));
-
-  const actualEntries = (entries || [])
-    .map((entry) => ({
-      ...entry,
-      week_end: reportById[entry.weekly_report_id]?.week_end,
-    }))
-    .filter((entry) => entry.week_end)
-    .sort((a, b) => dateValue(a.week_end) - dateValue(b.week_end));
-
-  const points = [];
-  let cursor = new Date(minDate);
-
-  while (cursor <= maxDate) {
-    const cursorTime = cursor.getTime();
-
-    const plannedWeighted = rows.reduce((sum, row) => {
-      const start = dateValue(row.planned_start);
-      const finish = dateValue(row.planned_finish);
-      const weight = toNumber(row.weight_percent);
-
-      if (!start || !finish) return sum;
-      if (cursorTime < start) return sum;
-      if (cursorTime >= finish) return sum + weight;
-
-      const ratio = (cursorTime - start) / Math.max(1, finish - start);
-      return sum + weight * ratio;
-    }, 0);
-
-    const actualByActivity = {};
-    for (const entry of actualEntries) {
-      if (dateValue(entry.week_end) <= cursorTime) {
-        const activityId = entry.activity_id || entry.wbs_activity_id;
-        actualByActivity[activityId] =
-          toNumber(actualByActivity[activityId]) + toNumber(entry.actual_quantity);
-      }
-    }
-
-    const actualWeighted = rows.reduce((sum, row) => {
-      const baseline = toNumber(row.baseline_quantity);
-      const actual = toNumber(actualByActivity[row.id]);
-      const activityProgress = baseline ? Math.min(actual / baseline, 1) : 0;
-      return sum + activityProgress * toNumber(row.weight_percent);
-    }, 0);
-
-    points.push({
-      week: formatWeek(cursor),
-      planned: Math.round((plannedWeighted / totalWeight) * 100),
-      actual: Math.round((actualWeighted / totalWeight) * 100),
-    });
-
-    cursor = addDays(cursor, 7);
-  }
-
-  return points.slice(-14);
+async function loadProject(projectId) {
+  const { data, error } = await supabase.from("projects").select("*").eq("id", projectId).single();
+  if (error) throw new Error(error.message);
+  return data;
 }
 
-function buildWeeklyProductionByDiscipline(rows, weeklyReports, entries) {
-  const latestReport = [...(weeklyReports || [])].sort(
-    (a, b) => dateValue(b.week_end) - dateValue(a.week_end)
-  )[0];
-
-  if (!latestReport) return [];
-
-  const rowById = Object.fromEntries(rows.map((row) => [row.id, row]));
-
-  const totals = {};
-
-  for (const entry of entries || []) {
-    if (entry.weekly_report_id !== latestReport.id) continue;
-
-    const activityId = entry.activity_id || entry.wbs_activity_id;
-    const row = rowById[activityId];
-    const discipline = row?.discipline || "General";
-
-    totals[discipline] = toNumber(totals[discipline]) + toNumber(entry.actual_quantity);
-  }
-
-  return Object.entries(totals).map(([discipline, quantity]) => ({
-    discipline,
-    quantity,
-  }));
-}
-
-export async function loadRealConstructionDashboard(projectId) {
-  const { data: project, error: projectError } = await supabase
-    .from("projects")
-    .select("*")
-    .eq("id", projectId)
-    .single();
-
-  if (projectError) throw projectError;
-
-  const { data: activities, error: wbsError } = await supabase
+async function loadWbs(projectId) {
+  const { data, error } = await supabase
     .from("wbs_activities")
     .select("*")
     .eq("project_id", projectId)
     .order("sort_order", { ascending: true });
 
-  if (wbsError) throw wbsError;
+  if (error) throw new Error(error.message);
 
-  const { data: weeklyReports, error: reportsError } = await supabase
+  return (data || []).filter((row) => row.is_group !== true);
+}
+
+async function loadWeeklyReports(projectId) {
+  const { data, error } = await supabase
     .from("weekly_reports")
     .select("*")
     .eq("project_id", projectId)
-    .order("week_end", { ascending: true });
+    .in("status", ["SUBMITTED", "VALIDATED", "APPROVED", "submitted", "validated", "approved"])
+    .order("week_start", { ascending: true });
 
-  if (reportsError) throw reportsError;
+  if (error) return [];
+  return data || [];
+}
 
-  const { data: entries, error: entriesError } = await supabase
-    .from("weekly_entries")
-    .select("id, project_id, weekly_report_id, activity_id, wbs_activity_id, actual_quantity")
-    .eq("project_id", projectId);
+async function loadWeeklyEntries(reportIds) {
+  if (reportIds.length === 0) return [];
 
-  if (entriesError) throw entriesError;
+  const attempts = [
+    async () =>
+      supabase
+        .from("weekly_entries")
+        .select("*")
+        .in("weekly_report_id", reportIds),
+    async () =>
+      supabase
+        .from("weekly_production")
+        .select("*")
+        .in("weekly_report_id", reportIds),
+    async () =>
+      supabase
+        .from("weekly_activities")
+        .select("*")
+        .in("weekly_report_id", reportIds),
+  ];
 
-  const actualByActivity = {};
-
-  for (const entry of entries || []) {
-    const activityId = entry.activity_id || entry.wbs_activity_id;
-    actualByActivity[activityId] =
-      toNumber(actualByActivity[activityId]) + toNumber(entry.actual_quantity);
+  for (const attempt of attempts) {
+    const { data, error } = await attempt();
+    if (!error) return data || [];
   }
 
-  const weightedModel = buildWbsWeightModel(activities || []);
+  return [];
+}
 
-  const rows = weightedModel.rows.map((activity) => {
-    const actual = actualByActivity[activity.id] || 0;
-    const baseline = toNumber(activity.baseline_quantity);
-    const rowProgress = progress(actual, baseline);
+function getEntryActivityId(entry) {
+  return entry.activity_id || entry.wbs_activity_id || entry.wbs_id || null;
+}
+
+function getEntryQuantity(entry) {
+  return n(
+    entry.installed_quantity ??
+      entry.produced_quantity ??
+      entry.quantity ??
+      entry.actual_quantity ??
+      entry.qty ??
+      0
+  );
+}
+
+function buildActualMap(entries) {
+  return entries.reduce((acc, entry) => {
+    const activityId = getEntryActivityId(entry);
+    if (!activityId) return acc;
+    acc[activityId] = n(acc[activityId]) + getEntryQuantity(entry);
+    return acc;
+  }, {});
+}
+
+function buildCurve({ activities, actualMap }) {
+  const today = new Date();
+
+  const planned = round(
+    activities.reduce((sum, activity) => {
+      return sum + (plannedProgress(activity, today) / 100) * n(activity.weight_percent);
+    }, 0)
+  );
+
+  const actual = round(
+    activities.reduce((sum, activity) => {
+      const baseline = n(activity.baseline_quantity);
+      const installed = n(actualMap[activity.id]);
+      const progress = baseline > 0 ? Math.min((installed / baseline) * 100, 100) : 0;
+      return sum + (progress / 100) * n(activity.weight_percent);
+    }, 0)
+  );
+
+  return [
+    { week: "Baseline", planned: 0, actual: 0 },
+    { week: "Today", planned, actual },
+  ];
+}
+
+export async function loadRealConstructionDashboard(projectId) {
+  const [project, activities, reports] = await Promise.all([
+    loadProject(projectId),
+    loadWbs(projectId),
+    loadWeeklyReports(projectId),
+  ]);
+
+  const entries = await loadWeeklyEntries(reports.map((report) => report.id));
+  const actualMap = buildActualMap(entries);
+  const today = new Date();
+
+  const enriched = activities.map((activity) => {
+    const baseline = n(activity.baseline_quantity);
+    const installed = n(actualMap[activity.id]);
+    const actualProgress = baseline > 0 ? Math.min((installed / baseline) * 100, 100) : 0;
+    const planned = plannedProgress(activity, today);
+    const weight = n(activity.weight_percent);
 
     return {
-      ...activity,
-      actual_quantity: actual,
-      remaining_quantity: Math.max(0, baseline - actual),
-      progress: rowProgress,
+      id: activity.id,
+      code: activity.code,
+      name: activity.name,
+      discipline: activity.discipline || "GENERAL",
+      weight,
+      baseline,
+      installed,
+      actualProgress,
+      plannedProgress: planned,
+      earnedWeight: (actualProgress / 100) * weight,
+      plannedWeight: (planned / 100) * weight,
+      variance: actualProgress - planned,
+      status: activity.status,
+      plannedStart: activity.planned_start,
+      plannedFinish: activity.planned_finish,
     };
   });
 
-  const operativeRows = rows.filter((row) => row.is_leaf);
+  const totalWeight = enriched.reduce((sum, item) => sum + item.weight, 0);
+  const earnedWeight = enriched.reduce((sum, item) => sum + item.earnedWeight, 0);
+  const plannedWeight = enriched.reduce((sum, item) => sum + item.plannedWeight, 0);
 
-  const totalWeight = operativeRows.reduce(
-    (sum, row) => sum + toNumber(row.real_weight_percent),
-    0
-  ) || 1;
+  const actualProgress = totalWeight > 0 ? round((earnedWeight / totalWeight) * 100) : 0;
+  const plannedProgressValue = totalWeight > 0 ? round((plannedWeight / totalWeight) * 100) : 0;
+  const scheduleGap = round(actualProgress - plannedProgressValue);
 
-  const weightedProgress = operativeRows.reduce(
-    (sum, row) => sum + row.progress * toNumber(row.real_weight_percent),
-    0
-  );
+  const criticalActivities = enriched
+    .filter((item) => item.plannedProgress >= 20 && item.actualProgress < item.plannedProgress - 10)
+    .sort((a, b) => a.variance - b.variance);
 
-  const totalProgress = Math.round(weightedProgress / totalWeight);
+  const blocked = enriched.filter((item) => String(item.status || "").toLowerCase() === "blocked").length;
 
   const disciplines = Object.values(
-    operativeRows.reduce((acc, row) => {
-      const key = row.discipline || "General";
-
-      if (!acc[key]) {
-        acc[key] = {
-          discipline: key,
+    enriched.reduce((acc, item) => {
+      if (!acc[item.discipline]) {
+        acc[item.discipline] = {
+          discipline: item.discipline,
           weight: 0,
-          weightedProgress: 0,
+          earnedWeight: 0,
+          plannedWeight: 0,
           activities: 0,
-          completed: 0,
-          remaining: 0,
         };
       }
 
-      acc[key].weight += toNumber(row.real_weight_percent);
-      acc[key].weightedProgress += row.progress * toNumber(row.real_weight_percent);
-      acc[key].activities += 1;
-      acc[key].completed += row.progress >= 100 ? 1 : 0;
-      acc[key].remaining += toNumber(row.remaining_quantity);
-
+      acc[item.discipline].weight += item.weight;
+      acc[item.discipline].earnedWeight += item.earnedWeight;
+      acc[item.discipline].plannedWeight += item.plannedWeight;
+      acc[item.discipline].activities += 1;
       return acc;
     }, {})
   ).map((item) => ({
     ...item,
-    progress: item.weight ? Math.round(item.weightedProgress / item.weight) : 0,
+    progress: item.weight > 0 ? round((item.earnedWeight / item.weight) * 100) : 0,
+    planned: item.weight > 0 ? round((item.plannedWeight / item.weight) * 100) : 0,
   }));
-
-  const criticalActivities = operativeRows
-    .filter((row) => row.progress < 100 && toNumber(row.real_weight_percent) >= 3)
-    .sort((a, b) => toNumber(b.real_weight_percent) - toNumber(a.real_weight_percent))
-    .slice(0, 6);
-
-  const blocked = operativeRows.filter((row) => row.status === "blocked").length;
-  const completed = operativeRows.filter((row) => row.progress >= 100).length;
-
-  const curve = buildPlannedActualCurve(rows, weeklyReports || [], entries || []);
-  const latestCurvePoint = curve[curve.length - 1] || { planned: 0, actual: 0 };
-  const scheduleGap = latestCurvePoint.actual - latestCurvePoint.planned;
 
   const healthScore = Math.max(
     0,
-    Math.min(
-      100,
-      Math.round(
-        50 +
-          scheduleGap * 0.8 +
-          totalProgress * 0.25 -
-          criticalActivities.length * 3 -
-          blocked * 10
-      )
-    )
+    Math.min(100, Math.round(100 + scheduleGap - criticalActivities.length * 5 - blocked * 10))
   );
 
-  const healthBreakdown = [
-    { label: "Schedule", value: Math.max(0, Math.min(100, 70 + scheduleGap)) },
-    { label: "Progress", value: totalProgress },
-    { label: "Critical", value: Math.max(0, 100 - criticalActivities.length * 12) },
-    { label: "Blocked", value: Math.max(0, 100 - blocked * 25) },
-  ];
-
   return {
-    project,
-    rows,
-    totalProgress,
-    healthScore,
-    completed,
-    blocked,
-    totalActivities: operativeRows.length,
-    disciplines,
-    criticalActivities,
-    curve,
+    project: {
+      id: project.id,
+      code: project.code,
+      name: project.name,
+      status: project.status || null,
+      location: projectLocation(project),
+    },
+    totalProgress: actualProgress,
+    plannedProgress: plannedProgressValue,
     scheduleGap,
-    weeklyProduction: buildWeeklyProductionByDiscipline(rows, weeklyReports || [], entries || []),
-    healthBreakdown,
+    healthScore,
+    blocked,
+    criticalActivities,
+    disciplines,
+    curve: buildCurve({ activities, actualMap }),
+    weightDistribution: disciplines.map((item) => ({
+      discipline: item.discipline,
+      value: round(item.weight),
+    })),
+    healthBreakdown: [
+      { label: "Health", value: healthScore },
+      { label: "Risk", value: 100 - healthScore },
+    ],
+    weeklyReports: reports.length,
+    weeklyEntries: entries.length,
+    decisionFeed:
+      reports.length === 0
+        ? [
+            {
+              type: "DATA",
+              title: "Nessuna Weekly reale caricata",
+              message: "Actual Progress impostato a 0%. La Control Room non usa più installed_quantity della WBS.",
+            },
+          ]
+        : criticalActivities.slice(0, 4).map((activity) => ({
+            type: "ACTION",
+            title: `${activity.code} · ${activity.name}`,
+            message: `${activity.discipline}: ${round(activity.actualProgress)}% actual vs ${round(
+              activity.plannedProgress
+            )}% planned.`,
+          })),
   };
 }
