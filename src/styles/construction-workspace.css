@@ -304,3 +304,54 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ---------- Weekly production enterprise ---------- */
+
+.weekly-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.weekly-toolbar {
+  grid-template-columns: 1.5fr 240px !important;
+}
+
+.cw-weekly-grid {
+  min-width: 1380px;
+}
+
+.cw-weekly-grid th:first-child,
+.cw-weekly-grid td:first-child {
+  width: auto !important;
+  min-width: 110px !important;
+  max-width: none !important;
+  padding: 9px 10px !important;
+  text-align: left !important;
+}
+
+.cw-weekly-grid th:nth-child(2),
+.cw-weekly-grid td:nth-child(2) {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: #020617;
+  min-width: 420px;
+}
+
+.cw-activity-readonly {
+  font-weight: 900;
+  color: #f8fafc;
+}
+
+@media (max-width: 1180px) {
+  .weekly-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .weekly-toolbar {
+    grid-template-columns: 1fr !important;
+  }
+}
