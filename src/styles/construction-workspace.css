@@ -246,3 +246,12 @@
 .cw-grid select {
   min-height: 42px;
 }
+
+.cw-delete-row {
+  background: rgba(239, 68, 68, 0.22) !important;
+  color: #fecaca !important;
+}
+
+.cw-delete-row:hover {
+  background: rgba(239, 68, 68, 0.42) !important;
+}

@@ -166,6 +166,51 @@ export default function ConstructionWorkspace() {
     );
   }
 
+  async function addActivity() {
+    if (!projectId) return;
+
+    const maxSort = Math.max(0, ...activities.map((activity) => Number(activity.sort_order || 0)));
+
+    const { error } = await supabase.from("wbs_activities").insert({
+      project_id: projectId,
+      code: "NEW",
+      name: "Nuova attività WBS",
+      discipline: "General",
+      unit: "unit",
+      baseline_quantity: 0,
+      weight_percent: 0,
+      planned_start: null,
+      planned_finish: null,
+      sort_order: maxSort + 1,
+      status: "not_started",
+    });
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    await loadWorkspace();
+  }
+
+  async function deleteActivity(activity) {
+    const confirmed = window.confirm(`Eliminare definitivamente questa attività?\n\n${activity.code} · ${activity.name}`);
+
+    if (!confirmed) return;
+
+    const { error } = await supabase
+      .from("wbs_activities")
+      .delete()
+      .eq("id", activity.id);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    await loadWorkspace();
+  }
+
   async function saveBaseline(activity) {
     const { error } = await supabase
       .from("wbs_activities")
@@ -319,6 +364,10 @@ export default function ConstructionWorkspace() {
           <option value="completed">Completed</option>
         </select>
 
+        <button type="button" onClick={addActivity}>
+          + Add WBS Activity
+        </button>
+
         <button type="button" onClick={saveWeekly} disabled={saving}>
           {saving ? "Saving..." : `Save Weekly ${week.weekStart}`}
         </button>
@@ -345,6 +394,7 @@ export default function ConstructionWorkspace() {
                 <th>Finish</th>
                 <th>Status</th>
                 <th>Save</th>
+                <th>Delete</th>
               </tr>
             </thead>
 
@@ -459,6 +509,15 @@ export default function ConstructionWorkspace() {
                     <td>
                       <button type="button" onClick={() => saveBaseline(activity)}>
                         Save
+                      </button>
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        className="cw-delete-row"
+                        onClick={() => deleteActivity(activity)}
+                      >
+                        Delete
                       </button>
                     </td>
                   </tr>
