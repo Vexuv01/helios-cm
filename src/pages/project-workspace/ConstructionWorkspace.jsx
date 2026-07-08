@@ -26,6 +26,7 @@ export default function ConstructionWorkspace() {
   const week = getCurrentWeekRange();
 
   const [mode, setMode] = useState("EXECUTION");
+  const [activityTab, setActivityTab] = useState("OVERVIEW");
   const [snapshot, setSnapshot] = useState(null);
   const [weekly, setWeekly] = useState(null);
   const [selectedActivity, setSelectedActivity] = useState(null);
@@ -83,6 +84,7 @@ export default function ConstructionWorkspace() {
 
   function selectActivity(activity) {
     setSelectedActivity(activity);
+    setActivityTab("OVERVIEW");
 
     const row = weekly?.rows?.find((item) => item.activity.id === activity.id);
     setWeeklyQty(row?.quantityThisWeek || 0);
@@ -240,15 +242,43 @@ export default function ConstructionWorkspace() {
                 </article>
               </section>
 
-              <section className="cw-progress-panel">
-                <span>Activity Progress</span>
-                <strong>{pct(progress(selectedActivity))}</strong>
-                <div>
-                  <i style={{ width: `${progress(selectedActivity)}%` }} />
-                </div>
-              </section>
+              <nav className="cw-activity-tabs">
+                {["OVERVIEW", "WEEKLY", "PHOTOS", "DOCUMENTS", "ISSUES", "DECISIONS"].map((tab) => (
+                  <button
+                    key={tab}
+                    type="button"
+                    className={activityTab === tab ? "active" : ""}
+                    onClick={() => setActivityTab(tab)}
+                  >
+                    {tab}
+                  </button>
+                ))}
+              </nav>
 
-              {mode === "PLANNING" ? (
+              {activityTab === "OVERVIEW" && (
+                <section className="cw-progress-panel">
+                  <span>Activity Progress</span>
+                  <strong>{pct(progress(selectedActivity))}</strong>
+                  <div>
+                    <i style={{ width: `${progress(selectedActivity)}%` }} />
+                  </div>
+                </section>
+              )}
+
+              {activityTab !== "OVERVIEW" && activityTab !== "WEEKLY" && (
+                <section className="cw-operational-card">
+                  <div className="cw-section-title">
+                    <span>{activityTab}</span>
+                    <h4>{activityTab.toLowerCase()} workspace</h4>
+                  </div>
+                  <p className="cw-placeholder">
+                    Sezione pronta per Sprint successivo. Sarà collegata ad attività WBS,
+                    Weekly Report e Supabase.
+                  </p>
+                </section>
+              )}
+
+              {(activityTab === "OVERVIEW" || activityTab === "WEEKLY") && mode === "PLANNING" ? (
                 <section className="cw-operational-card">
                   <div className="cw-section-title">
                     <span>Baseline & Planning</span>
