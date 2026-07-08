@@ -1,64 +1,44 @@
-export default function ActivityHeader({
-  activity,
-  health,
-  mode,
-  saving,
-  onSave,
-  onTabChange,
-}) {
+export default function ActivityHeader({ mode, onModeChange, metrics }) {
   return (
-    <header className="cw-activity-header">
+    <header className="cw-header">
       <div>
-        <span>
-          {mode === "PLANNING"
-            ? "Planning Activity"
-            : "Execution Activity"}
-        </span>
-
-        <h3>{activity.name}</h3>
-
-        <p>
-          {activity.code} · {activity.discipline} · {activity.unit}
-        </p>
-
-        <small>
-          Status: <strong>{activity.status}</strong>
-          {" • "}
-          Health: <strong>{health.label}</strong>
-        </small>
+        <span className="cw-kicker">HELIOS CM Enterprise</span>
+        <h1>Construction Workspace</h1>
+        <p>Vista operativa unica per WBS, produzione weekly, rischio e decisioni di cantiere.</p>
       </div>
 
-      <div className="cw-header-actions">
+      <div className="cw-header-right">
+        <div className="cw-kpi">
+          <span>Progress</span>
+          <strong>{metrics.progress}%</strong>
+        </div>
 
-        <button type="button" onClick={() => onTabChange("WEEKLY")}>
-          Weekly
-        </button>
+        <div className="cw-kpi">
+          <span>Activities</span>
+          <strong>{metrics.totalActivities}</strong>
+        </div>
 
-        <button type="button" onClick={() => onTabChange("PHOTOS")}>
-          Photos
-        </button>
+        <div className="cw-kpi danger">
+          <span>High Risk</span>
+          <strong>{metrics.highRisk}</strong>
+        </div>
 
-        <button type="button" onClick={() => onTabChange("DOCUMENTS")}>
-          Documents
-        </button>
-
-        <button type="button" disabled>
-          Issues
-        </button>
-
-        <button type="button" disabled>
-          Decisions
-        </button>
-
-        {mode === "EXECUTION" && (
+        <div className="cw-toggle">
           <button
             type="button"
-            onClick={onSave}
-            disabled={saving}
+            className={mode === "execution" ? "active" : ""}
+            onClick={() => onModeChange("execution")}
           >
-            {saving ? "Saving..." : "Save Execution"}
+            Execution
           </button>
-        )}
+          <button
+            type="button"
+            className={mode === "planning" ? "active" : ""}
+            onClick={() => onModeChange("planning")}
+          >
+            Planning
+          </button>
+        </div>
       </div>
     </header>
   );

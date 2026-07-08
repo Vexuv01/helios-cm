@@ -1,67 +1,110 @@
-export default function ActivityCommandCenter({ activity, weeklyEntries = [] }) {
+function getProgress(activity) {
+  if (!activity?.plannedQuantity) return 0;
+  return Math.min(
+    100,
+    Math.round((Number(activity.actualQuantity || 0) / Number(activity.plannedQuantity)) * 100)
+  );
+}
+
+export default function ActivityCommandCenter({
+  activity,
+  metrics,
+  onChange,
+  onAddActivity,
+  onDeleteActivity,
+}) {
   if (!activity) {
     return (
-      <section className="activity-command-center empty">
-        <h2>Nessuna attività selezionata</h2>
-        <p>Seleziona un’attività WBS per entrare in modalità operativa.</p>
-      </section>
+      <aside className="cw-panel cw-command">
+        <div className="cw-panel-head">
+          <div>
+            <span>Command</span>
+            <strong>Center</strong>
+          </div>
+        </div>
+      </aside>
     );
   }
 
-  const actualQuantity = weeklyEntries
-    .filter((entry) => entry.activityId === activity.id)
-    .reduce((sum, entry) => sum + Number(entry.actualQuantity || entry.quantity || 0), 0);
-
-  const baselineQuantity = Number(activity.quantity || activity.baselineQuantity || 0);
-  const progress = baselineQuantity > 0 ? Math.min(100, Math.round((actualQuantity / baselineQuantity) * 100)) : 0;
-  const remaining = Math.max(0, baselineQuantity - actualQuantity);
+  const progress = getProgress(activity);
 
   return (
-    <section className="activity-command-center">
-      <div>
-        <span className="eyebrow">Activity Command Center</span>
-        <h2>{activity.name || activity.title}</h2>
-        <p>{activity.discipline || activity.category || "Construction Activity"}</p>
+    <aside className="cw-panel cw-command">
+      <div className="cw-panel-head">
+        <div>
+          <span>Command</span>
+          <strong>Center</strong>
+        </div>
       </div>
 
-      <div className="activity-kpi-grid">
-        <div className="activity-kpi">
-          <span>Baseline</span>
-          <strong>{baselineQuantity}</strong>
-          <small>{activity.unit || "unità"}</small>
-        </div>
+      <div className="cw-command-card">
+        <span>Selected activity</span>
+        <strong>{activity.name}</strong>
+        <small>
+          {activity.code} · {activity.owner}
+        </small>
+      </div>
 
-        <div className="activity-kpi">
-          <span>Actual</span>
-          <strong>{actualQuantity}</strong>
-          <small>{activity.unit || "unità"}</small>
-        </div>
-
-        <div className="activity-kpi">
-          <span>Remaining</span>
-          <strong>{remaining}</strong>
-          <small>{activity.unit || "unità"}</small>
-        </div>
-
-        <div className="activity-kpi">
-          <span>Progress</span>
+      <div className="cw-command-grid">
+        <div>
+          <span>Activity</span>
           <strong>{progress}%</strong>
-          <small>weekly actual</small>
+        </div>
+        <div>
+          <span>Workspace</span>
+          <strong>{metrics.progress}%</strong>
+        </div>
+        <div>
+          <span>In Progress</span>
+          <strong>{metrics.inProgress}</strong>
+        </div>
+        <div>
+          <span>Completed</span>
+          <strong>{metrics.completed}</strong>
         </div>
       </div>
 
-      <div className="execution-progress">
-        <div style={{ width: `${progress}%` }} />
+      <div className="cw-actions">
+        <button type="button" onClick={onAddActivity}>
+          Add activity
+        </button>
+
+        <button
+          type="button"
+          onClick={() =>
+            onChange(activity.id, {
+              status: "completed",
+              actualQuantity: activity.plannedQuantity,
+            })
+          }
+        >
+          Mark completed
+        </button>
+
+        <button
+          type="button"
+          onClick={() =>
+            onChange(activity.id, {
+              risk: activity.risk === "high" ? "medium" : "high",
+            })
+          }
+        >
+          Toggle risk
+        </button>
+
+        <button type="button" className="danger" onClick={() => onDeleteActivity(activity.id)}>
+          Delete activity
+        </button>
       </div>
 
-      <div className="next-action-box">
-        <span>Next action</span>
-        <strong>
-          {progress >= 100
-            ? "Attività completata: pronta per verifica / evidenze."
-            : "Aggiorna weekly, foto e documenti collegati a questa attività."}
-        </strong>
+      <div className="cw-command-card">
+        <span>Decision hint</span>
+        <p>
+          {activity.risk === "high"
+            ? "Attività critica: serve recovery plan, verifica produttività e impatto su COD."
+            : "Attività sotto controllo: continuare monitoraggio da Weekly Actual Production."}
+        </p>
       </div>
-    </section>
+    </aside>
   );
 }
