@@ -560,3 +560,35 @@
   color: var(--muted);
   overflow-wrap: anywhere;
 }
+
+.photo-lightbox-actions {
+  position: sticky;
+  top: 14px;
+  z-index: 2;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px;
+}
+
+.photo-lightbox-actions button {
+  border: 0;
+  border-radius: 999px;
+  padding: 10px 14px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.photo-lightbox-actions button.danger {
+  background: #fecaca;
+  color: #7f1d1d;
+}
+
+.photo-lightbox-actions button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.photo-lightbox-content > button {
+  display: none;
+}

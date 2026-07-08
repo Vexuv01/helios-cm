@@ -67,3 +67,24 @@ export async function uploadActivityPhoto({
 
   return insert.data;
 }
+
+
+export async function deleteActivityPhoto(photo) {
+  if (!photo?.id) throw new Error("Missing photo id");
+  if (!photo?.file_path) throw new Error("Missing photo file path");
+
+  const storageDelete = await supabase.storage
+    .from(PHOTO_BUCKET)
+    .remove([photo.file_path]);
+
+  if (storageDelete.error) throw storageDelete.error;
+
+  const dbDelete = await supabase
+    .from("construction_photos")
+    .delete()
+    .eq("id", photo.id);
+
+  if (dbDelete.error) throw dbDelete.error;
+
+  return true;
+}

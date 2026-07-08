@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   loadActivityPhotos,
   uploadActivityPhoto,
+  deleteActivityPhoto,
 } from "./services/photoService";
 
 export default function ActivityPhotos({
@@ -14,6 +15,7 @@ export default function ActivityPhotos({
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState("");
   const [selectedPhoto, setSelectedPhoto] = useState(null);
 
@@ -82,6 +84,31 @@ export default function ActivityPhotos({
       setError(err.message || "Unable to upload photo");
     } finally {
       setUploading(false);
+    }
+  }
+
+  async function handleDeletePhoto() {
+    if (!selectedPhoto) return;
+
+    const confirmed = window.confirm(
+      "Vuoi eliminare definitivamente questa foto da HELIOS?"
+    );
+
+    if (!confirmed) return;
+
+    setDeleting(true);
+    setError("");
+
+    try {
+      await deleteActivityPhoto(selectedPhoto);
+      setSelectedPhoto(null);
+      setPhotos((current) =>
+        current.filter((photo) => photo.id !== selectedPhoto.id)
+      );
+    } catch (err) {
+      setError(err.message || "Unable to delete photo");
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -190,9 +217,19 @@ export default function ActivityPhotos({
           }}
         >
           <div className="photo-lightbox-content" onClick={(event) => event.stopPropagation()}>
-            <button type="button" onClick={() => setSelectedPhoto(null)}>
-              Close
-            </button>
+            <div className="photo-lightbox-actions">
+              <button
+                type="button"
+                className="danger"
+                onClick={handleDeletePhoto}
+                disabled={deleting}
+              >
+                {deleting ? "Deleting..." : "Delete"}
+              </button>
+              <button type="button" onClick={() => setSelectedPhoto(null)}>
+                Close
+              </button>
+            </div>
             <img
               src={selectedPhoto.publicUrl}
               alt={selectedPhoto.description || selectedPhoto.file_name || "Construction"}
