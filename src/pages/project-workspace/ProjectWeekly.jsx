@@ -3,24 +3,34 @@ import { useParams } from "react-router-dom";
 import { supabase } from "../../lib/supabaseClient";
 import "../../styles/construction-workspace.css";
 
-function getWeekRange(date = new Date()) {
-  const current = new Date(date);
-  const day = current.getDay();
-  const diffToMonday = current.getDate() - day + (day === 0 ? -6 : 1);
-  const monday = new Date(current.setDate(diffToMonday));
+function iso(date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function mondayOf(value = new Date()) {
+  const date = new Date(value);
+  date.setHours(12, 0, 0, 0);
+  const day = date.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  date.setDate(date.getDate() + diff);
+  return date;
+}
+
+function weekFromMonday(mondayIso) {
+  const monday = mondayOf(`${mondayIso}T12:00:00`);
   const friday = new Date(monday);
   friday.setDate(monday.getDate() + 4);
 
   return {
-    weekStart: monday.toISOString().slice(0, 10),
-    weekEnd: friday.toISOString().slice(0, 10),
+    weekStart: iso(monday),
+    weekEnd: iso(friday),
   };
 }
 
-function shiftWeekStart(weekStart, offset) {
-  const date = new Date(`${weekStart}T00:00:00`);
-  date.setDate(date.getDate() + offset * 7);
-  return getWeekRange(date).weekStart;
+function shiftMonday(mondayIso, weeks) {
+  const date = mondayOf(`${mondayIso}T12:00:00`);
+  date.setDate(date.getDate() + weeks * 7);
+  return iso(date);
 }
 
 function toNumber(value) {
@@ -49,8 +59,8 @@ export default function ProjectWeekly() {
   const params = useParams();
   const routeProjectId = params.projectId || params.id;
 
-  const [weekStart, setWeekStart] = useState(() => getWeekRange().weekStart);
-  const week = useMemo(() => getWeekRange(new Date(`${weekStart}T00:00:00`)), [weekStart]);
+  const [weekStart, setWeekStart] = useState(() => iso(mondayOf()));
+  const week = useMemo(() => weekFromMonday(weekStart), [weekStart]);
 
   const [projects, setProjects] = useState([]);
   const [projectId, setProjectId] = useState(routeProjectId || "");
@@ -77,8 +87,9 @@ export default function ProjectWeekly() {
   );
 
   const visibleActivities = useMemo(() => {
+    const term = search.toLowerCase();
+
     return operationalActivities.filter((activity) => {
-      const term = search.toLowerCase();
       const matchSearch =
         !search ||
         String(activity.code || "").toLowerCase().includes(term) ||
@@ -99,22 +110,22 @@ export default function ProjectWeekly() {
     [weeklyValues]
   );
 
-  const loadWeekly = useCallback(async (targetProjectId, targetWeekStart) => {
+  const loadWeekly = useCallback(async () => {
     setLoading(true);
 
-    const { data: projectRows, error: projectsError } = await supabase
+    const { data: projectRows } = await supabase
       .from("projects")
       .select("*")
       .order("code", { ascending: true });
 
-    if (projectsError) alert(projectsError.message);
-
     const nextProjects = projectRows || [];
-    const nextProjectId = targetProjectId || routeProjectId || nextProjects[0]?.id || "";
-    const targetWeek = getWeekRange(new Date(`${targetWeekStart}T00:00:00`));
+    const nextProjectId = projectId || routeProjectId || nextProjects[0]?.id || "";
 
     setProjects(nextProjects);
-    setProjectId(nextProjectId);
+
+    if (!projectId && nextProjectId) {
+      setProjectId(nextProjectId);
+    }
 
     if (!nextProjectId) {
       setActivities([]);
@@ -140,7 +151,7 @@ export default function ProjectWeekly() {
     if (reportsError) alert(reportsError.message);
 
     const nextReports = reportRows || [];
-    const currentReport = nextReports.find((item) => item.week_start === targetWeek.weekStart) || null;
+    const currentReport = nextReports.find((item) => item.week_start === week.weekStart) || null;
 
     const reportIds = nextReports.map((item) => item.id);
     let entries = [];
@@ -169,7 +180,7 @@ export default function ProjectWeekly() {
         currentValues[activityId] = qty;
       }
 
-      if (relatedReport?.week_start < targetWeek.weekStart && isActualStatus(relatedReport?.status)) {
+      if (relatedReport?.week_start < week.weekStart && isActualStatus(relatedReport?.status)) {
         cumulative[activityId] = toNumber(cumulative[activityId]) + qty;
       }
     });
@@ -180,11 +191,11 @@ export default function ProjectWeekly() {
     setWeeklyValues(currentValues);
     setCumulativeValues(cumulative);
     setLoading(false);
-  }, [routeProjectId]);
+  }, [projectId, routeProjectId, week.weekStart]);
 
   useEffect(() => {
-    loadWeekly(projectId, weekStart);
-  }, [loadWeekly, projectId, weekStart]);
+    loadWeekly();
+  }, [loadWeekly]);
 
   async function ensureReport(status = "DRAFT") {
     const { data, error } = await supabase
@@ -233,7 +244,7 @@ export default function ProjectWeekly() {
         if (error) throw new Error(error.message);
       }
 
-      await loadWeekly(projectId, weekStart);
+      await loadWeekly();
     } catch (error) {
       alert(error.message);
     } finally {
@@ -250,14 +261,6 @@ export default function ProjectWeekly() {
     if (!window.confirm("Confermi il submit della Weekly? Dopo il submit non sarà più modificabile dall'EPC.")) return;
 
     await saveWeekly("SUBMITTED");
-  }
-
-  function goToPreviousWeek() {
-    setWeekStart((current) => shiftWeekStart(current, -1));
-  }
-
-  function goToNextWeek() {
-    setWeekStart((current) => shiftWeekStart(current, 1));
   }
 
   return (
@@ -282,13 +285,19 @@ export default function ProjectWeekly() {
       </header>
 
       <section className="weekly-period-bar">
-        <button type="button" onClick={goToPreviousWeek}>← Previous week</button>
+        <button type="button" onClick={() => setWeekStart((current) => shiftMonday(current, -1))}>
+          ← Previous week
+        </button>
+
         <div>
           <span>Weekly Period</span>
           <strong>{week.weekStart} / {week.weekEnd}</strong>
           <small>Status: {report?.status || "DRAFT"}</small>
         </div>
-        <button type="button" onClick={goToNextWeek}>Next week →</button>
+
+        <button type="button" onClick={() => setWeekStart((current) => shiftMonday(current, 1))}>
+          Next week →
+        </button>
       </section>
 
       <section className="cw-metrics">
