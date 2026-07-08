@@ -66,3 +66,38 @@
   display: grid;
   gap: 20px;
 }
+
+.construction-tree-node > button {
+  appearance: none;
+  border-radius: 0;
+}
+
+.construction-tree-node > button,
+.construction-tree-activity {
+  font-family: inherit;
+}
+
+.construction-tree-node > button * {
+  pointer-events: none;
+}
+
+.construction-tree-activity strong,
+.construction-tree-activity span {
+  display: block;
+}
+
+.construction-tree-activity strong {
+  font-size: 13px;
+  color: #e2e8f0;
+}
+
+.construction-tree-activity span {
+  margin-top: 3px;
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.construction-tree-activity em {
+  min-width: 56px;
+  text-align: center;
+}

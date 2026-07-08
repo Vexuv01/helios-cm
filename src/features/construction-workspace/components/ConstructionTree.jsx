@@ -6,10 +6,13 @@ function formatPercent(value) {
   return `${Number(value || 0).toFixed(1)}%`;
 }
 
-function riskClass(delayDays) {
-  if (delayDays >= 14) return "high";
-  if (delayDays >= 5) return "medium";
-  return "low";
+function groupByDiscipline(activities = []) {
+  return activities.reduce((acc, activity) => {
+    const discipline = activity.discipline || "GENERAL";
+    if (!acc[discipline]) acc[discipline] = [];
+    acc[discipline].push(activity);
+    return acc;
+  }, {});
 }
 
 export default function ConstructionTree() {
@@ -29,14 +32,14 @@ export default function ConstructionTree() {
       const data = await loadProjectWbs(projectId);
       setSnapshot(data);
 
-      const initialExpanded = {};
-      data.disciplineProgress?.forEach((discipline) => {
-        initialExpanded[discipline.discipline] = true;
-      });
+      setExpanded((current) => {
+        if (Object.keys(current).length) return current;
 
-      setExpanded((current) =>
-        Object.keys(current).length ? current : initialExpanded
-      );
+        return (data.disciplines || []).reduce((acc, discipline) => {
+          acc[discipline.discipline] = true;
+          return acc;
+        }, {});
+      });
     } catch (err) {
       setError(err.message || "Unable to load Construction Tree");
     } finally {
@@ -48,16 +51,10 @@ export default function ConstructionTree() {
     loadTree();
   }, [loadTree]);
 
-  const activitiesByDiscipline = useMemo(() => {
-    if (!snapshot?.activities) return {};
-
-    return snapshot.activities.reduce((acc, activity) => {
-      const key = activity.discipline || "GENERAL";
-      if (!acc[key]) acc[key] = [];
-      acc[key].push(activity);
-      return acc;
-    }, {});
-  }, [snapshot]);
+  const activitiesByDiscipline = useMemo(
+    () => groupByDiscipline(snapshot?.activities || []),
+    [snapshot]
+  );
 
   function toggle(discipline) {
     setExpanded((current) => ({
@@ -89,26 +86,24 @@ export default function ConstructionTree() {
             <article key={discipline.discipline} className="construction-tree-node">
               <button type="button" onClick={() => toggle(discipline.discipline)}>
                 <span>{isOpen ? "▾" : "▸"}</span>
+
                 <div>
                   <strong>{discipline.discipline}</strong>
-                  <small>
-                    {rows.length} activities · {formatPercent(discipline.weightPercent)} weight
-                  </small>
+                  <small>{rows.length} activities · {formatPercent(discipline.weightPercent)} weight</small>
                 </div>
+
                 <b>{formatPercent(discipline.progress)}</b>
               </button>
 
               {isOpen ? (
                 <div className="construction-tree-children">
-                  {rows.slice(0, 8).map((activity) => (
+                  {rows.map((activity) => (
                     <div key={activity.id} className="construction-tree-activity">
                       <div>
                         <strong>{activity.code}</strong>
                         <span>{activity.name}</span>
                       </div>
-                      <em className={riskClass(activity.delayDays)}>
-                        {formatPercent(activity.progress)}
-                      </em>
+                      <em>{formatPercent(activity.progress)}</em>
                     </div>
                   ))}
                 </div>
