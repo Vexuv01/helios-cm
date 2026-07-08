@@ -1,4 +1,5 @@
 import { buildConstructionSnapshot } from "../../../domain/construction-engine";
+import { CONSTRUCTION_EVENTS, emitConstructionEvent } from "../../../shared/events/constructionEvents";
 import {
   createWbsActivity,
   deleteWbsActivity,
@@ -73,12 +74,39 @@ export async function saveWbsActivity(projectId, activity) {
     sortOrder: Number(activity.sortOrder || 0),
   };
 
-  if (payload.id) return updateWbsActivity(payload);
-  return createWbsActivity(payload);
+  const savedActivity = payload.id
+    ? await updateWbsActivity(payload)
+    : await createWbsActivity(payload);
+
+  emitConstructionEvent(CONSTRUCTION_EVENTS.ACTIVITY_CHANGED, {
+    projectId,
+    activityId: savedActivity.id,
+    action: payload.id ? "updated" : "created",
+  });
+
+  emitConstructionEvent(CONSTRUCTION_EVENTS.SNAPSHOT_INVALIDATED, {
+    projectId,
+    reason: "activity_saved",
+  });
+
+  return savedActivity;
 }
 
-export async function removeWbsActivity(id) {
-  return deleteWbsActivity(id);
+export async function removeWbsActivity(id, projectId = null) {
+  const deletedId = await deleteWbsActivity(id);
+
+  emitConstructionEvent(CONSTRUCTION_EVENTS.ACTIVITY_CHANGED, {
+    projectId,
+    activityId: id,
+    action: "deleted",
+  });
+
+  emitConstructionEvent(CONSTRUCTION_EVENTS.SNAPSHOT_INVALIDATED, {
+    projectId,
+    reason: "activity_deleted",
+  });
+
+  return deletedId;
 }
 
 export async function importPvAgripvWbsTemplate(projectId) {
@@ -123,6 +151,11 @@ export async function importPvAgripvWbsTemplate(projectId) {
 
     created.push(activity);
   }
+
+  emitConstructionEvent(CONSTRUCTION_EVENTS.SNAPSHOT_INVALIDATED, {
+    projectId,
+    reason: "template_imported",
+  });
 
   return created;
 }

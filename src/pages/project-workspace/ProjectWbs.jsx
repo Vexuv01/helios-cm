@@ -188,7 +188,7 @@ export default function ProjectWbs() {
     setError("");
 
     try {
-      await removeWbsActivity(activity.id);
+      await removeWbsActivity(activity.id, projectId);
       if (selectedActivity?.id === activity.id) setSelectedActivity(null);
       await refreshWbs();
     } catch (err) {
