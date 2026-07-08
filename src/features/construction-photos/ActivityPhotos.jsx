@@ -15,6 +15,7 @@ export default function ActivityPhotos({
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
+  const [selectedPhoto, setSelectedPhoto] = useState(null);
 
   const previewUrl = useMemo(() => {
     if (!file) return "";
@@ -143,7 +144,16 @@ export default function ActivityPhotos({
       ) : (
         <div className="photo-grid">
           {photos.map((photo) => (
-            <article key={photo.id} className="photo-card">
+            <article
+              key={photo.id}
+              className="photo-card"
+              role="button"
+              tabIndex={0}
+              onClick={() => setSelectedPhoto(photo)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") setSelectedPhoto(photo);
+              }}
+            >
               <img
                 src={photo.publicUrl}
                 alt={photo.description || photo.file_name || "Construction"}
@@ -165,6 +175,33 @@ export default function ActivityPhotos({
               </div>
             </article>
           ))}
+        </div>
+      )}
+      {selectedPhoto && (
+        <div
+          className="photo-lightbox"
+          role="button"
+          tabIndex={0}
+          onClick={() => setSelectedPhoto(null)}
+          onKeyDown={(event) => {
+            if (event.key === "Escape" || event.key === "Enter") {
+              setSelectedPhoto(null);
+            }
+          }}
+        >
+          <div className="photo-lightbox-content" onClick={(event) => event.stopPropagation()}>
+            <button type="button" onClick={() => setSelectedPhoto(null)}>
+              Close
+            </button>
+            <img
+              src={selectedPhoto.publicUrl}
+              alt={selectedPhoto.description || selectedPhoto.file_name || "Construction"}
+            />
+            <div>
+              <strong>{selectedPhoto.description || "Construction photo"}</strong>
+              <span>{selectedPhoto.file_name}</span>
+            </div>
+          </div>
         </div>
       )}
     </section>

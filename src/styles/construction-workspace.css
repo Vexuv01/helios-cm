@@ -500,3 +500,63 @@
     flex-direction: column;
   }
 }
+
+.photo-card {
+  cursor: zoom-in;
+}
+
+.photo-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+  background: rgba(0, 0, 0, 0.82);
+}
+
+.photo-lightbox-content {
+  position: relative;
+  width: min(1100px, 96vw);
+  max-height: 92vh;
+  overflow: auto;
+  border-radius: 24px;
+  background: #111827;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.photo-lightbox-content > button {
+  position: sticky;
+  top: 14px;
+  left: calc(100% - 92px);
+  z-index: 2;
+  margin: 14px;
+  border: 0;
+  border-radius: 999px;
+  padding: 10px 14px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.photo-lightbox-content img {
+  display: block;
+  width: 100%;
+  max-height: 74vh;
+  object-fit: contain;
+  background: #000;
+}
+
+.photo-lightbox-content div {
+  padding: 18px;
+}
+
+.photo-lightbox-content strong,
+.photo-lightbox-content span {
+  display: block;
+}
+
+.photo-lightbox-content span {
+  margin-top: 6px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
