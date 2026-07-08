@@ -41,15 +41,14 @@ function ProjectWorkspaceShell() {
           </Link>
           <p className="workspace-eyebrow">HELIOS Project Operating System</p>
           <h1>{currentProject?.name}</h1>
-          <p className="workspace-subtitle">
-            {currentProject?.location || "Location not defined"}
-          </p>
         </div>
 
-        <div className="workspace-status-card">
-          <span>Status</span>
-          <strong>{currentProject?.status || "N/A"}</strong>
-        </div>
+        {currentProject?.status && (
+          <div className="workspace-status-card">
+            <span>Status</span>
+            <strong>{currentProject.status}</strong>
+          </div>
+        )}
       </header>
 
       <nav className="workspace-tabs" aria-label="Project workspace navigation">

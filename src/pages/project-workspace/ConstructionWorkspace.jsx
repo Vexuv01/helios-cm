@@ -88,7 +88,7 @@ export default function ConstructionWorkspace() {
     };
   }, [baselineActivities]);
 
-  const loadWorkspace = useCallback(async () => {
+  const loadWorkspace = useCallback(async (targetProjectId = projectId) => {
     setLoading(true);
 
     const { data: projectRows } = await supabase
@@ -97,7 +97,7 @@ export default function ConstructionWorkspace() {
       .order("code", { ascending: true });
 
     const nextProjects = projectRows || [];
-    const nextProjectId = routeProjectId || projectId || nextProjects[0]?.id || "";
+    const nextProjectId = targetProjectId || routeProjectId || nextProjects[0]?.id || "";
 
     setProjects(nextProjects);
     setProjectId(nextProjectId);
@@ -199,7 +199,14 @@ export default function ConstructionWorkspace() {
 
         <div className="cw-project-select">
           <label>Project</label>
-          <select value={projectId} onChange={(event) => setProjectId(event.target.value)}>
+          <select
+            value={projectId}
+            onChange={(event) => {
+              const nextProjectId = event.target.value;
+              setProjectId(nextProjectId);
+              loadWorkspace(nextProjectId);
+            }}
+          >
             {projects.map((project) => (
               <option key={project.id} value={project.id}>
                 {project.code} · {project.name}

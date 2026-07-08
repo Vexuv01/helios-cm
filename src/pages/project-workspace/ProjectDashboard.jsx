@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   Area,
   AreaChart,
@@ -26,6 +26,7 @@ function pct(value) {
 
 export default function ProjectDashboard() {
   const params = useParams();
+  const navigate = useNavigate();
   const initialProjectId = params.projectId || params.id || "";
 
   const [projects, setProjects] = useState([]);
@@ -84,7 +85,9 @@ export default function ProjectDashboard() {
   }, [loadDashboard, projectId]);
 
   function handleProjectChange(event) {
-    setProjectId(event.target.value);
+    const nextProjectId = event.target.value;
+    setProjectId(nextProjectId);
+    navigate(`/projects/${nextProjectId}/dashboard`);
   }
 
   if (loading) {
@@ -130,14 +133,6 @@ export default function ProjectDashboard() {
             <strong>{selectedProject.code}</strong>
             <small>{selectedProject.name}</small>
           </div>
-
-          {dashboard?.project?.location && (
-            <div className="hero-kpi">
-              <span>Location</span>
-              <strong>{dashboard.project.location}</strong>
-              <small>From Supabase project data</small>
-            </div>
-          )}
 
           {dashboard?.project?.status && (
             <div className="hero-kpi">
