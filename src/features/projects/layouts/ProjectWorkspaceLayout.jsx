@@ -4,7 +4,8 @@ import { useProject } from "../context/useProject";
 
 const workspaceTabs = [
   { label: "Control Room", path: "dashboard" },
-  { label: "Manage Construction", path: "wbs" },
+  { label: "WBS Planning", path: "wbs" },
+  { label: "Weekly Production", path: "weekly" },
   { label: "Documents", path: "documents" },
 ];
 
