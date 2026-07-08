@@ -252,6 +252,32 @@ export default function ProjectWeekly() {
     }
   }
 
+  async function unlockWeekly() {
+    if (!report?.id) return;
+
+    const confirmed = window.confirm(
+      "Admin override: vuoi riaprire questa Weekly e riportarla in DRAFT?"
+    );
+
+    if (!confirmed) return;
+
+    setSaving(true);
+
+    const { error } = await supabase
+      .from("weekly_reports")
+      .update({ status: "DRAFT" })
+      .eq("id", report.id);
+
+    if (error) {
+      alert(error.message);
+      setSaving(false);
+      return;
+    }
+
+    setSaving(false);
+    await loadWeekly();
+  }
+
   async function submitWeekly() {
     if (weeklyTotal <= 0) {
       alert("Inserisci almeno una quantità prima del submit.");
@@ -321,6 +347,12 @@ export default function ProjectWeekly() {
           <button type="button" className="cw-secondary-action" onClick={submitWeekly} disabled={saving || locked}>
             Submit Weekly
           </button>
+
+          {locked && (
+            <button type="button" className="cw-danger-action" onClick={unlockWeekly} disabled={saving}>
+              Admin Unlock
+            </button>
+          )}
         </div>
       </section>
 
