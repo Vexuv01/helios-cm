@@ -4,16 +4,15 @@ import reactHooks from "eslint-plugin-react-hooks";
 import reactRefresh from "eslint-plugin-react-refresh";
 
 export default [
+  { ignores: ["dist"] },
+
   {
-    ignores: ["dist"],
-  },
-  js.configs.recommended,
-  {
-    files: ["**/*.{js,jsx}"],
+    files: ["**/*.{js,jsx,mjs}"],
     languageOptions: {
-      ecmaVersion: "latest",
+      ecmaVersion: 2020,
       globals: globals.browser,
       parserOptions: {
+        ecmaVersion: "latest",
         ecmaFeatures: { jsx: true },
         sourceType: "module",
       },
@@ -23,12 +22,25 @@ export default [
       "react-refresh": reactRefresh,
     },
     rules: {
+      ...js.configs.recommended.rules,
       ...reactHooks.configs.recommended.rules,
-      "react-hooks/set-state-in-effect": "off",
+      "no-unused-vars": ["error", { varsIgnorePattern: "^[A-Z_]" }],
       "react-refresh/only-export-components": [
         "warn",
-        { allowConstantExport: true }
+        { allowConstantExport: true },
       ],
+      "react-hooks/set-state-in-effect": "off",
+    },
+  },
+
+  {
+    files: ["scripts/**/*.mjs"],
+    languageOptions: {
+      ecmaVersion: 2020,
+      globals: {
+        ...globals.node,
+      },
+      sourceType: "module",
     },
   },
 ];

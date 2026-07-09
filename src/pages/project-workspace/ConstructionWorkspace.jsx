@@ -137,7 +137,7 @@ export default function ConstructionWorkspace() {
       if (!nextProjectId) {
         setActivities([]);
         setDirtyIds(new Set());
-      setSelectedIds(new Set());
+        setSelectedIds(new Set());
         setLoading(false);
         return;
       }
@@ -155,7 +155,7 @@ export default function ConstructionWorkspace() {
       setDirtyIds(new Set());
       setLoading(false);
     },
-    [projectId, routeProjectId]
+    [projectId, routeProjectId, templateProjectId]
   );
 
   useEffect(() => {
