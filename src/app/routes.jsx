@@ -1,4 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+
 import Portfolio from "../pages/Portfolio";
 import ProjectWorkspaceLayout from "../features/projects/layouts/ProjectWorkspaceLayout";
 
@@ -11,13 +12,31 @@ import ProjectCommissioning from "../pages/project-workspace/ProjectCommissionin
 import ProjectAnalytics from "../pages/project-workspace/ProjectAnalytics";
 import ProjectSettings from "../pages/project-workspace/ProjectSettings";
 
+import { LoginPage, ProtectedRoute } from "../features/auth";
+
 export default function AppRoutes() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Portfolio />} />
+        <Route path="/login" element={<LoginPage />} />
 
-        <Route path="/projects/:projectId" element={<ProjectWorkspaceLayout />}>
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              <Portfolio />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/projects/:projectId"
+          element={
+            <ProtectedRoute>
+              <ProjectWorkspaceLayout />
+            </ProtectedRoute>
+          }
+        >
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<ProjectDashboard />} />
           <Route path="wbs" element={<ConstructionWorkspace />} />
