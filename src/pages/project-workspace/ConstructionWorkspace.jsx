@@ -50,7 +50,7 @@ export default function ConstructionWorkspace() {
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("all");
-  const [newActivityCategory, setNewActivityCategory] = useState("CIVIL");
+  const [newActivityCategory] = useState("GENERAL");
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [templateProjectId, setTemplateProjectId] = useState("");
 
@@ -457,18 +457,6 @@ export default function ConstructionWorkspace() {
 
         <select value={category} onChange={(event) => setCategory(event.target.value)}>
           <option value="all">All categories</option>
-          {categories.map((item) => (
-            <option key={item} value={item}>
-              {item}
-            </option>
-          ))}
-        </select>
-
-        <select
-          title="Category for new activity"
-          value={newActivityCategory}
-          onChange={(event) => setNewActivityCategory(event.target.value)}
-        >
           {categories.map((item) => (
             <option key={item} value={item}>
               {item}
