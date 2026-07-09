@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "../../lib/supabaseClient";
 import { buildWbsWeightModel } from "../../services/wbsWeightEngine";
@@ -48,6 +48,8 @@ export default function ConstructionWorkspace() {
   const [dirtyIds, setDirtyIds] = useState(new Set());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [importingExcel, setImportingExcel] = useState(false);
+  const excelInputRef = useRef(null);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("all");
   const [newActivityCategory] = useState("GENERAL");
@@ -304,83 +306,6 @@ export default function ConstructionWorkspace() {
     await loadWorkspace(projectId);
   }
 
-  async function importTemplateIntoCurrentProject() {
-    if (!projectId || !templateProjectId) {
-      alert("Seleziona progetto target e progetto modello.");
-      return;
-    }
-
-    if (projectId === templateProjectId) {
-      alert("Il progetto modello deve essere diverso dal progetto corrente.");
-      return;
-    }
-
-    const sourceProject = projects.find((project) => project.id === templateProjectId);
-    const targetProject = projects.find((project) => project.id === projectId);
-
-    const confirmed = window.confirm(
-      `Importare la WBS da ${sourceProject?.code || "modello"} dentro ${targetProject?.code || "progetto corrente"}? Le attività esistenti NON saranno cancellate. Le date saranno vuote.`
-    );
-
-    if (!confirmed) return;
-
-    setSaving(true);
-
-    const { data: sourceRows, error: sourceError } = await supabase
-      .from("wbs_activities")
-      .select("*")
-      .eq("project_id", templateProjectId)
-      .order("sort_order", { ascending: true })
-      .order("code", { ascending: true });
-
-    if (sourceError) {
-      alert(sourceError.message);
-      setSaving(false);
-      return;
-    }
-
-    const sourceActivities = (sourceRows || []).filter((row) => row.is_group !== true);
-
-    if (sourceActivities.length === 0) {
-      alert("Il progetto modello non contiene attività WBS.");
-      setSaving(false);
-      return;
-    }
-
-    const existingCodes = new Set(
-      activities.map((activity) => String(activity.code || "").trim().toUpperCase())
-    );
-
-    const rowsToInsert = sourceActivities
-      .filter((activity) => !existingCodes.has(String(activity.code || "").trim().toUpperCase()))
-      .map((activity, index) => ({
-        ...cleanActivity(activity),
-        project_id: projectId,
-        planned_start: null,
-        planned_finish: null,
-        actual_start: null,
-        actual_finish: null,
-        sort_order: activities.length + index + 1,
-      }));
-
-    if (rowsToInsert.length === 0) {
-      alert("Nessuna attività da importare: i codici WBS sono già presenti nel progetto.");
-      setSaving(false);
-      return;
-    }
-
-    const { error: insertError } = await supabase.from("wbs_activities").insert(rowsToInsert);
-
-    if (insertError) {
-      alert(insertError.message);
-      setSaving(false);
-      return;
-    }
-
-    setSaving(false);
-    await loadWorkspace(projectId);
-    alert(`Import completato: ${rowsToInsert.length} attività aggiunte senza date.`);
-  }
 
   return (
     <main className="construction-workspace">
@@ -466,23 +391,28 @@ export default function ConstructionWorkspace() {
 
         <button type="button" onClick={addActivity}>+ Activity</button>
 
-        <select
-          title="Source WBS template"
-          value={templateProjectId}
-          onChange={(event) => setTemplateProjectId(event.target.value)}
-        >
-          <option value="">Select WBS model</option>
-          {projects
-            .filter((project) => project.id !== projectId)
-            .map((project) => (
-              <option key={project.id} value={project.id}>
-                Model: {project.code} · {project.name}
-              </option>
-            ))}
-        </select>
+        <input
+          ref={excelInputRef}
+          type="file"
+          accept=".xlsx,.xls"
+          style={{ display: "none" }}
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            event.target.value = "";
+            if (!file) return;
+            setImportingExcel(true);
+            window.alert(`Excel selected: ${file.name}. Parser will be enabled in the next sprint.`);
+            setImportingExcel(false);
+          }}
+        />
 
-        <button type="button" className="cw-secondary-action" onClick={importTemplateIntoCurrentProject}>
-          Import WBS into this project
+        <button
+          type="button"
+          className="cw-secondary-action"
+          onClick={() => excelInputRef.current?.click()}
+          disabled={importingExcel}
+        >
+          {importingExcel ? "Reading Excel..." : "Import Excel"}
         </button>
 
         <button type="button" className="cw-danger-action" onClick={deleteSelectedActivities} disabled={selectedIds.size === 0}>
