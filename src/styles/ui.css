@@ -90,28 +90,35 @@
   font-size: 14px;
 }
 
+
 .global-user-menu {
   position: fixed;
-  top: 18px;
-  right: 18px;
-  z-index: 1000;
+  top: 16px;
+  right: 16px;
+  z-index: 9999;
   display: flex;
   align-items: center;
   gap: 12px;
+  max-width: 360px;
   padding: 10px 12px;
-  border-radius: 14px;
-  background: rgba(12, 16, 24, 0.88);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  backdrop-filter: blur(14px);
-  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.28);
+  border-radius: 16px;
+  background: rgba(12, 16, 24, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.32);
 }
 
 .global-user-menu div {
   display: grid;
   gap: 2px;
+  min-width: 0;
 }
 
 .global-user-menu strong {
+  max-width: 190px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: #fff;
   font-size: 13px;
 }
@@ -124,6 +131,7 @@
 }
 
 .global-user-menu button {
+  flex: 0 0 auto;
   border: 0;
   border-radius: 10px;
   padding: 8px 12px;
