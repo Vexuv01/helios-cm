@@ -1,6 +1,7 @@
-import { NavLink, Outlet, Link } from "react-router-dom";
+import { NavLink, Outlet, Link, useNavigate } from "react-router-dom";
 import { ProjectProvider } from "../context/ProjectContext";
 import { useProject } from "../context/useProject";
+import { useAuth } from "../../auth";
 
 const workspaceTabs = [
   { label: "Control Room", path: "dashboard" },
@@ -10,7 +11,14 @@ const workspaceTabs = [
 ];
 
 function ProjectWorkspaceShell() {
+  const navigate = useNavigate();
   const { currentProject, projectLoading, projectError } = useProject();
+  const { profile, user, signOut } = useAuth();
+
+  async function handleLogout() {
+    await signOut();
+    navigate("/login", { replace: true });
+  }
 
   if (projectLoading) {
     return (
@@ -46,6 +54,14 @@ function ProjectWorkspaceShell() {
           </p>
 
           <h1>{currentProject?.name}</h1>
+        </div>
+
+        <div className="workspace-user">
+          <span>{profile?.full_name || user?.email}</span>
+          <small>{profile?.role || "USER"}</small>
+          <button type="button" onClick={handleLogout}>
+            Logout
+          </button>
         </div>
       </header>
 
