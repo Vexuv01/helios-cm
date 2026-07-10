@@ -7,6 +7,8 @@ import {
 import { supabase } from "../../lib/supabaseClient";
 import "../../styles/forecast.css";
 
+const ACTUAL_WEEKLY_STATUSES = new Set(["SUBMITTED", "VALIDATED", "APPROVED", "LOCKED"]);
+
 function toNumber(value) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
@@ -19,6 +21,35 @@ function iso(value) {
   return date.toISOString().slice(0, 10);
 }
 
+function getEntryQty(entry) {
+  return toNumber(
+    entry.actual_quantity ??
+      entry.installed_quantity ??
+      entry.produced_quantity ??
+      entry.quantity ??
+      entry.qty ??
+      0
+  );
+}
+
+function getEntryActivityId(entry) {
+  return entry.wbs_activity_id || entry.activity_id || entry.wbs_id || "";
+}
+
+function isActualReport(report) {
+  return ACTUAL_WEEKLY_STATUSES.has(String(report.status || "").toUpperCase());
+}
+
+function buildActualQtyMap(entries) {
+  return entries.reduce((acc, entry) => {
+    const activityId = getEntryActivityId(entry);
+    if (!activityId) return acc;
+
+    acc[activityId] = toNumber(acc[activityId]) + getEntryQty(entry);
+    return acc;
+  }, {});
+}
+
 function daysBetween(start, finish) {
   if (!start || !finish) return 0;
   const a = new Date(`${start}T12:00:00`);
@@ -27,11 +58,19 @@ function daysBetween(start, finish) {
   return Math.round((b.getTime() - a.getTime()) / 86400000);
 }
 
-function mergeRows(activities, forecasts) {
+function remainingDays(forecastFinish) {
+  if (!forecastFinish) return 0;
+  return Math.max(0, daysBetween(iso(new Date()), forecastFinish));
+}
+
+function mergeRows(activities, forecasts, actualQtyMap) {
   const forecastByActivity = new Map(forecasts.map((item) => [item.activityId, item]));
 
   return activities.map((activity) => {
     const forecast = forecastByActivity.get(activity.id);
+    const baselineQuantity = toNumber(activity.baseline_quantity);
+    const actualQuantity = toNumber(actualQtyMap[activity.id]);
+    const remainingQuantity = Math.max(0, baselineQuantity - actualQuantity);
 
     return {
       activityId: activity.id,
@@ -39,7 +78,9 @@ function mergeRows(activities, forecasts) {
       name: activity.name || "",
       discipline: activity.discipline || "GENERAL",
       unit: activity.unit || "",
-      baselineQuantity: toNumber(activity.baseline_quantity),
+      baselineQuantity,
+      actualQuantity,
+      remainingQuantity,
       weightPercent: toNumber(activity.weight_percent),
       plannedStart: iso(activity.planned_start),
       plannedFinish: iso(activity.planned_finish),
@@ -64,10 +105,15 @@ export default function ProjectForecast() {
   const metrics = useMemo(() => {
     const totalActivities = rows.length;
     const forecasted = rows.filter((row) => row.forecastStart && row.forecastFinish).length;
+
     const totalWeight = rows.reduce((sum, row) => sum + toNumber(row.weightPercent), 0);
     const forecastedWeight = rows
       .filter((row) => row.forecastStart && row.forecastFinish)
       .reduce((sum, row) => sum + toNumber(row.weightPercent), 0);
+
+    const totalBaselineQty = rows.reduce((sum, row) => sum + toNumber(row.baselineQuantity), 0);
+    const totalActualQty = rows.reduce((sum, row) => sum + toNumber(row.actualQuantity), 0);
+    const totalRemainingQty = rows.reduce((sum, row) => sum + toNumber(row.remainingQuantity), 0);
 
     const baselineFinish = rows
       .map((row) => row.plannedFinish)
@@ -86,6 +132,9 @@ export default function ProjectForecast() {
       forecasted,
       totalWeight: Number(totalWeight.toFixed(2)),
       forecastedWeight: Number(forecastedWeight.toFixed(2)),
+      totalBaselineQty: Number(totalBaselineQty.toFixed(2)),
+      totalActualQty: Number(totalActualQty.toFixed(2)),
+      totalRemainingQty: Number(totalRemainingQty.toFixed(2)),
       baselineFinish: baselineFinish || "—",
       forecastFinish: forecastFinish || "—",
     };
@@ -95,7 +144,11 @@ export default function ProjectForecast() {
     setLoading(true);
 
     try {
-      const [{ data: activities, error }, forecasts] = await Promise.all([
+      const [
+        { data: activities, error: activitiesError },
+        { data: weeklyReports, error: reportsError },
+        forecasts,
+      ] = await Promise.all([
         supabase
           .from("wbs_activities")
           .select("*")
@@ -103,12 +156,33 @@ export default function ProjectForecast() {
           .eq("is_group", false)
           .order("sort_order", { ascending: true })
           .order("code", { ascending: true }),
+        supabase
+          .from("weekly_reports")
+          .select("*")
+          .eq("project_id", projectId),
         loadRecoveryForecast(projectId),
       ]);
 
-      if (error) throw new Error(error.message);
+      if (activitiesError) throw new Error(activitiesError.message);
+      if (reportsError) throw new Error(reportsError.message);
 
-      setRows(mergeRows(activities || [], forecasts));
+      const actualReportIds = (weeklyReports || []).filter(isActualReport).map((report) => report.id);
+
+      let weeklyEntries = [];
+
+      if (actualReportIds.length) {
+        const { data: entriesData, error: entriesError } = await supabase
+          .from("weekly_entries")
+          .select("*")
+          .in("weekly_report_id", actualReportIds);
+
+        if (entriesError) throw new Error(entriesError.message);
+        weeklyEntries = entriesData || [];
+      }
+
+      const actualQtyMap = buildActualQtyMap(weeklyEntries);
+
+      setRows(mergeRows(activities || [], forecasts, actualQtyMap));
       setDirtyIds(new Set());
     } catch (err) {
       window.alert(err.message || "Errore caricamento Recovery Forecast");
@@ -175,8 +249,8 @@ export default function ProjectForecast() {
           <span>Recovery Forecast</span>
           <h1>EPC Recovery Plan</h1>
           <p>
-            Modifica le date forecast senza alterare la baseline WBS originale. La Dashboard
-            userà queste date per generare la terza S-Curve.
+            Pianifica il recupero sul residuo reale: Baseline Qty meno Actual Qty da Weekly.
+            La baseline WBS non viene modificata.
           </p>
         </div>
 
@@ -192,9 +266,14 @@ export default function ProjectForecast() {
           <small>WBS operational rows</small>
         </article>
         <article>
-          <span>Forecasted</span>
-          <strong>{metrics.forecasted}</strong>
-          <small>Rows with forecast dates</small>
+          <span>Actual Qty</span>
+          <strong>{metrics.totalActualQty}</strong>
+          <small>From approved Weekly</small>
+        </article>
+        <article>
+          <span>Remaining Qty</span>
+          <strong>{metrics.totalRemainingQty}</strong>
+          <small>Baseline {metrics.totalBaselineQty}</small>
         </article>
         <article>
           <span>Forecasted Weight</span>
@@ -202,14 +281,9 @@ export default function ProjectForecast() {
           <small>Total WBS weight {metrics.totalWeight}%</small>
         </article>
         <article>
-          <span>Baseline Finish</span>
-          <strong>{metrics.baselineFinish}</strong>
-          <small>From original WBS</small>
-        </article>
-        <article>
           <span>Forecast Finish</span>
           <strong>{metrics.forecastFinish}</strong>
-          <small>From recovery plan</small>
+          <small>Baseline finish {metrics.baselineFinish}</small>
         </article>
       </section>
 
@@ -219,12 +293,16 @@ export default function ProjectForecast() {
             <tr>
               <th>Code</th>
               <th>Activity</th>
-              <th>Discipline</th>
+              <th>Unit</th>
+              <th>Baseline Qty</th>
+              <th>Actual Qty</th>
+              <th>Remaining Qty</th>
               <th>Weight</th>
               <th>Baseline Start</th>
               <th>Baseline Finish</th>
               <th>Forecast Start</th>
               <th>Forecast Finish</th>
+              <th>Remaining Days</th>
               <th>Delta</th>
               <th>Note</th>
               <th></th>
@@ -234,12 +312,18 @@ export default function ProjectForecast() {
           <tbody>
             {rows.map((row) => {
               const delta = daysBetween(row.plannedFinish, row.forecastFinish);
+              const days = remainingDays(row.forecastFinish);
 
               return (
                 <tr key={row.activityId} className={dirtyIds.has(row.activityId) ? "forecast-dirty" : ""}>
                   <td>{row.code}</td>
                   <td className="forecast-activity">{row.name}</td>
-                  <td>{row.discipline}</td>
+                  <td>{row.unit || "—"}</td>
+                  <td>{row.baselineQuantity}</td>
+                  <td>{row.actualQuantity}</td>
+                  <td className={row.remainingQuantity > 0 ? "remaining-open" : "remaining-complete"}>
+                    {row.remainingQuantity}
+                  </td>
                   <td>{row.weightPercent}%</td>
                   <td>{row.plannedStart || "—"}</td>
                   <td>{row.plannedFinish || "—"}</td>
@@ -257,6 +341,7 @@ export default function ProjectForecast() {
                       onChange={(event) => updateRow(row.activityId, "forecastFinish", event.target.value)}
                     />
                   </td>
+                  <td>{row.forecastFinish ? `${days}d` : "—"}</td>
                   <td className={delta > 0 ? "delta-delay" : delta < 0 ? "delta-recovery" : ""}>
                     {row.forecastFinish ? `${delta > 0 ? "+" : ""}${delta}d` : "—"}
                   </td>

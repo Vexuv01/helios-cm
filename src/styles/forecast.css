@@ -160,3 +160,13 @@
     grid-template-columns: 1fr;
   }
 }
+
+.remaining-open {
+  color: #fde68a;
+  font-weight: 900;
+}
+
+.remaining-complete {
+  color: #86efac;
+  font-weight: 900;
+}
