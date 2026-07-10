@@ -140,3 +140,24 @@
   background: #d7b25f;
   color: #15110a;
 }
+
+.route-loader {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 32px;
+}
+
+.route-loader > div {
+  width: min(420px, 100%);
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 24px;
+  padding: 28px;
+  background: rgba(15, 23, 42, 0.72);
+  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.24);
+}
+
+.route-loader p {
+  margin: 10px 0 0;
+  color: rgba(226, 232, 240, 0.78);
+}
