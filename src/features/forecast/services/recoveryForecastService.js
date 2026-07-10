@@ -38,18 +38,18 @@ export async function loadRecoveryRevisions(projectId) {
 }
 
 export async function createRecoveryRevision(projectId) {
-  const existing = await loadRecoveryRevisions(projectId);
-  const nextRevisionNumber =
-    existing.length > 0
-      ? Math.max(...existing.map((item) => Number(item.revisionNumber || 0))) + 1
+  const revisions = await loadRecoveryRevisions(projectId);
+  const nextNumber =
+    revisions.length > 0
+      ? Math.max(...revisions.map((item) => item.revisionNumber)) + 1
       : 1;
 
   const { data, error } = await supabase
     .from("recovery_plan_revisions")
     .insert({
       project_id: projectId,
-      revision_number: nextRevisionNumber,
-      title: `Recovery Plan Rev.${nextRevisionNumber}`,
+      revision_number: nextNumber,
+      title: `Recovery Plan Rev.${nextNumber}`,
       status: "DRAFT",
       issue_date: new Date().toISOString().slice(0, 10),
     })
@@ -78,6 +78,27 @@ export async function updateRecoveryRevision(revision) {
   return normalizeRevision(data);
 }
 
+export async function activateRecoveryRevision(projectId, revisionId) {
+  if (!projectId || !revisionId) throw new Error("Recovery revision is required");
+
+  const reset = await supabase
+    .from("recovery_plan_revisions")
+    .update({ status: "DRAFT", updated_at: new Date().toISOString() })
+    .eq("project_id", projectId);
+
+  if (reset.error) throw new Error(reset.error.message);
+
+  const { data, error } = await supabase
+    .from("recovery_plan_revisions")
+    .update({ status: "ACTIVE", updated_at: new Date().toISOString() })
+    .eq("id", revisionId)
+    .select("*")
+    .single();
+
+  if (error) throw new Error(error.message);
+  return normalizeRevision(data);
+}
+
 export async function loadRecoveryItems(revisionId) {
   if (!revisionId) return [];
 
@@ -91,6 +112,8 @@ export async function loadRecoveryItems(revisionId) {
 }
 
 export async function saveRecoveryItems(revision, items) {
+  if (!revision?.id) throw new Error("Recovery revision is required");
+
   const rows = items
     .filter((item) => item.activityId)
     .map((item) => ({
@@ -112,4 +135,9 @@ export async function saveRecoveryItems(revision, items) {
 
   if (error) throw new Error(error.message);
   return (data || []).map(normalizeItem);
+}
+
+export async function loadActiveRecoveryRevision(projectId) {
+  const revisions = await loadRecoveryRevisions(projectId);
+  return revisions.find((item) => item.status === "ACTIVE") || revisions[0] || null;
 }

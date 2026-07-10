@@ -170,3 +170,21 @@
   color: #86efac;
   font-weight: 900;
 }
+
+.forecast-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.forecast-actions select,
+.forecast-actions input {
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.96);
+  color: #f8fafc;
+  padding: 12px;
+  outline: none;
+  font: inherit;
+}

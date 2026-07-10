@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import {
-  loadRecoveryForecast,
-  saveRecoveryForecast,
+  activateRecoveryRevision,
+  createRecoveryRevision,
+  loadRecoveryItems,
+  loadRecoveryRevisions,
+  saveRecoveryItems,
+  updateRecoveryRevision,
 } from "../../features/forecast/services/recoveryForecastService";
 import { supabase } from "../../lib/supabaseClient";
 import "../../styles/forecast.css";
@@ -97,6 +101,9 @@ export default function ProjectForecast() {
   const params = useParams();
   const projectId = params.projectId || params.id || "";
 
+  const [revisions, setRevisions] = useState([]);
+  const [selectedRevisionId, setSelectedRevisionId] = useState("");
+  const [selectedRevision, setSelectedRevision] = useState(null);
   const [rows, setRows] = useState([]);
   const [dirtyIds, setDirtyIds] = useState(new Set());
   const [loading, setLoading] = useState(true);
@@ -144,10 +151,22 @@ export default function ProjectForecast() {
     setLoading(true);
 
     try {
+      let nextRevisions = await loadRecoveryRevisions(projectId);
+
+      if (!nextRevisions.length) {
+        const created = await createRecoveryRevision(projectId);
+        nextRevisions = [created];
+      }
+
+      const nextSelectedRevision =
+        nextRevisions.find((revision) => revision.id === selectedRevisionId) ||
+        nextRevisions.find((revision) => revision.status === "ACTIVE") ||
+        nextRevisions[0];
+
       const [
         { data: activities, error: activitiesError },
         { data: weeklyReports, error: reportsError },
-        forecasts,
+        forecastItems,
       ] = await Promise.all([
         supabase
           .from("wbs_activities")
@@ -160,7 +179,7 @@ export default function ProjectForecast() {
           .from("weekly_reports")
           .select("*")
           .eq("project_id", projectId),
-        loadRecoveryForecast(projectId),
+        loadRecoveryItems(nextSelectedRevision.id),
       ]);
 
       if (activitiesError) throw new Error(activitiesError.message);
@@ -182,14 +201,17 @@ export default function ProjectForecast() {
 
       const actualQtyMap = buildActualQtyMap(weeklyEntries);
 
-      setRows(mergeRows(activities || [], forecasts, actualQtyMap));
+      setRevisions(nextRevisions);
+      setSelectedRevisionId(nextSelectedRevision.id);
+      setSelectedRevision(nextSelectedRevision);
+      setRows(mergeRows(activities || [], forecastItems, actualQtyMap));
       setDirtyIds(new Set());
     } catch (err) {
       window.alert(err.message || "Errore caricamento Recovery Forecast");
     } finally {
       setLoading(false);
     }
-  }, [projectId]);
+  }, [projectId, selectedRevisionId]);
 
   useEffect(() => {
     loadPage();
@@ -225,13 +247,43 @@ export default function ProjectForecast() {
     setSaving(true);
 
     try {
-      await saveRecoveryForecast(projectId, dirtyRows);
+      await updateRecoveryRevision(selectedRevision);
+      await saveRecoveryItems(selectedRevision, dirtyRows);
       await loadPage();
     } catch (err) {
       window.alert(err.message || "Errore salvataggio Recovery Forecast");
     } finally {
       setSaving(false);
     }
+  }
+
+  async function handleCreateRevision() {
+    try {
+      const created = await createRecoveryRevision(projectId);
+
+      if (selectedRevision) {
+        await saveRecoveryItems(created, rows);
+      }
+
+      setSelectedRevisionId(created.id);
+    } catch (err) {
+      window.alert(err.message || "Errore creazione Recovery Revision");
+    }
+  }
+
+  async function handleActivateRevision() {
+    if (!selectedRevision) return;
+
+    try {
+      await activateRecoveryRevision(projectId, selectedRevision.id);
+      await loadPage();
+    } catch (err) {
+      window.alert(err.message || "Errore attivazione Recovery Revision");
+    }
+  }
+
+  function updateRevision(field, value) {
+    setSelectedRevision((current) => ({ ...current, [field]: value }));
   }
 
   if (loading) {
@@ -254,9 +306,36 @@ export default function ProjectForecast() {
           </p>
         </div>
 
-        <button type="button" onClick={handleSave} disabled={dirtyIds.size === 0 || saving}>
-          {saving ? "Saving..." : `Save Forecast (${dirtyIds.size})`}
-        </button>
+        <div className="forecast-actions">
+          <select
+            value={selectedRevisionId}
+            onChange={(event) => setSelectedRevisionId(event.target.value)}
+          >
+            {revisions.map((revision) => (
+              <option key={revision.id} value={revision.id}>
+                Rev.{revision.revisionNumber} · {revision.status}
+              </option>
+            ))}
+          </select>
+
+          <input
+            type="date"
+            value={selectedRevision?.issueDate || ""}
+            onChange={(event) => updateRevision("issueDate", event.target.value)}
+          />
+
+          <button type="button" onClick={handleCreateRevision}>
+            + New Rev
+          </button>
+
+          <button type="button" onClick={handleActivateRevision}>
+            Set Active
+          </button>
+
+          <button type="button" onClick={handleSave} disabled={dirtyIds.size === 0 || saving}>
+            {saving ? "Saving..." : `Save (${dirtyIds.size})`}
+          </button>
+        </div>
       </header>
 
       <section className="forecast-kpis">

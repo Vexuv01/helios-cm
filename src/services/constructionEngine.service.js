@@ -66,6 +66,9 @@ function normalizeActivity(row, installedQuantity, forecast = null) {
     forecastStart: iso(forecast?.forecast_start),
     forecastFinish: iso(forecast?.forecast_finish),
     forecastNote: forecast?.forecast_note || "",
+    recoveryIssueDate: iso(forecast?.recovery_issue_date),
+    recoveryRevisionNumber: forecast?.recovery_revision_number || null,
+    recoveryStatus: forecast?.recovery_status || "",
     actualStart: iso(row.actual_start),
     actualFinish: iso(row.actual_finish),
     status: row.status || "BASELINE",
@@ -133,21 +136,32 @@ async function loadRecoveryForecasts(projectId) {
     .from("recovery_plan_revisions")
     .select("*")
     .eq("project_id", projectId)
-    .order("revision_number", { ascending: false })
-    .limit(1);
+    .order("revision_number", { ascending: false });
 
   if (revisionsError) throw new Error(revisionsError.message);
 
-  const latestRevision = revisions?.[0];
-  if (!latestRevision) return [];
+  const activeRevision =
+    revisions?.find((revision) => revision.status === "ACTIVE") ||
+    revisions?.[0];
+
+  if (!activeRevision) {
+    return {
+      revision: null,
+      items: [],
+    };
+  }
 
   const { data, error } = await supabase
     .from("recovery_plan_items")
     .select("*")
-    .eq("revision_id", latestRevision.id);
+    .eq("revision_id", activeRevision.id);
 
   if (error) throw new Error(error.message);
-  return data || [];
+
+  return {
+    revision: activeRevision,
+    items: data || [],
+  };
 }
 
 function buildInstalledMap(entries) {
@@ -376,6 +390,12 @@ function toDashboard({ project, rawActivities, activities, reports, actualReport
     blocked: activities.filter((activity) => String(activity.status || "").toLowerCase() === "blocked").length,
     criticalActivities,
     disciplines,
+    recoveryPlan: {
+      active: activities.some((activity) => activity.forecastStart && activity.forecastFinish),
+      issueDate: activities.find((activity) => activity.recoveryIssueDate)?.recoveryIssueDate || "",
+      revisionNumber: activities.find((activity) => activity.recoveryRevisionNumber)?.recoveryRevisionNumber || null,
+      status: activities.find((activity) => activity.recoveryStatus)?.recoveryStatus || "",
+    },
     hasRecoveryForecast: activities.some((activity) => activity.forecastStart && activity.forecastFinish),
     curve: buildCurve({ activities, reports, entries, plannedProgress, actualProgress: totalProgress }),
 
@@ -415,7 +435,7 @@ function toDashboard({ project, rawActivities, activities, reports, actualReport
 export async function loadRealConstructionDashboard(projectId) {
   if (!projectId) throw new Error("Project id is required");
 
-  const [project, rawActivities, reports, recoveryForecasts] = await Promise.all([
+  const [project, rawActivities, reports, recoveryPlan] = await Promise.all([
     loadProject(projectId),
     loadWbsActivities(projectId),
     loadWeeklyReports(projectId),
@@ -425,8 +445,13 @@ export async function loadRealConstructionDashboard(projectId) {
   const actualReports = reports.filter(isActualReport);
   const entries = await loadWeeklyEntries(actualReports.map((report) => report.id));
   const installedMap = buildInstalledMap(entries);
-  const forecastMap = recoveryForecasts.reduce((acc, forecast) => {
-    acc[forecast.wbs_activity_id] = forecast;
+  const forecastMap = recoveryPlan.items.reduce((acc, forecast) => {
+    acc[forecast.wbs_activity_id] = {
+      ...forecast,
+      recovery_issue_date: recoveryPlan.revision?.issue_date || "",
+      recovery_revision_number: recoveryPlan.revision?.revision_number || null,
+      recovery_status: recoveryPlan.revision?.status || "",
+    };
     return acc;
   }, {});
 
