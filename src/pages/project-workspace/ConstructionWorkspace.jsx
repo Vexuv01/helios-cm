@@ -456,11 +456,11 @@ export default function ConstructionWorkspace() {
                   />
                 </th>
                 <th>Code</th>
-                <th>Category</th>
                 <th>Activity</th>
+                <th>Category</th>
                 <th>U.M.</th>
-                <th>Baseline Qty</th>
-                <th>Weight %</th>
+                <th>Qty</th>
+                <th>Weight</th>
                 <th>Planned Start</th>
                 <th>Planned Finish</th>
                 <th>Status</th>
@@ -484,6 +484,12 @@ export default function ConstructionWorkspace() {
                       onChange={(event) => updateActivity(activity.id, "code", event.target.value)}
                     />
                   </td>
+                  <td className="baseline-activity-cell">
+                    <input
+                      value={activity.name || ""}
+                      onChange={(event) => updateActivity(activity.id, "name", event.target.value)}
+                    />
+                  </td>
                   <td>
                     <select
                       value={activity.discipline || "GENERAL"}
@@ -493,12 +499,6 @@ export default function ConstructionWorkspace() {
                         <option key={item} value={item}>{item}</option>
                       ))}
                     </select>
-                  </td>
-                  <td className="baseline-activity-cell">
-                    <input
-                      value={activity.name || ""}
-                      onChange={(event) => updateActivity(activity.id, "name", event.target.value)}
-                    />
                   </td>
                   <td>
                     <input

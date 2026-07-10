@@ -522,3 +522,172 @@
 .baseline-toolbar button {
   white-space: nowrap;
 }
+
+/* WBS compact enterprise grid sprint */
+.baseline-grid {
+  min-width: 1180px;
+}
+
+.baseline-grid th:nth-child(2),
+.baseline-grid td:nth-child(2) {
+  width: 120px;
+  min-width: 120px;
+}
+
+.baseline-grid th:nth-child(3),
+.baseline-grid td:nth-child(3) {
+  width: 320px;
+  min-width: 320px;
+}
+
+.baseline-grid th:nth-child(4),
+.baseline-grid td:nth-child(4) {
+  width: 180px;
+  min-width: 180px;
+}
+
+.baseline-grid th:nth-child(5),
+.baseline-grid td:nth-child(5) {
+  width: 80px;
+  min-width: 80px;
+}
+
+.baseline-grid th:nth-child(6),
+.baseline-grid td:nth-child(6) {
+  width: 115px;
+  min-width: 115px;
+}
+
+.baseline-grid th:nth-child(7),
+.baseline-grid td:nth-child(7) {
+  width: 105px;
+  min-width: 105px;
+}
+
+.baseline-grid th:nth-child(8),
+.baseline-grid td:nth-child(8),
+.baseline-grid th:nth-child(9),
+.baseline-grid td:nth-child(9) {
+  width: 135px;
+  min-width: 135px;
+}
+
+.baseline-grid th:nth-child(10),
+.baseline-grid td:nth-child(10) {
+  display: none;
+}
+
+.baseline-activity-cell input {
+  min-width: 300px;
+}
+
+/* WBS compact enterprise grid sprint */
+.baseline-grid {
+  min-width: 1180px;
+}
+
+.baseline-grid th:nth-child(2),
+.baseline-grid td:nth-child(2) {
+  width: 120px;
+  min-width: 120px;
+}
+
+.baseline-grid th:nth-child(3),
+.baseline-grid td:nth-child(3) {
+  width: 320px;
+  min-width: 320px;
+}
+
+.baseline-grid th:nth-child(4),
+.baseline-grid td:nth-child(4) {
+  width: 180px;
+  min-width: 180px;
+}
+
+.baseline-grid th:nth-child(5),
+.baseline-grid td:nth-child(5) {
+  width: 80px;
+  min-width: 80px;
+}
+
+.baseline-grid th:nth-child(6),
+.baseline-grid td:nth-child(6) {
+  width: 115px;
+  min-width: 115px;
+}
+
+.baseline-grid th:nth-child(7),
+.baseline-grid td:nth-child(7) {
+  width: 105px;
+  min-width: 105px;
+}
+
+.baseline-grid th:nth-child(8),
+.baseline-grid td:nth-child(8),
+.baseline-grid th:nth-child(9),
+.baseline-grid td:nth-child(9) {
+  width: 135px;
+  min-width: 135px;
+}
+
+.baseline-grid th:nth-child(10),
+.baseline-grid td:nth-child(10) {
+  display: none;
+}
+
+.baseline-activity-cell input {
+  min-width: 300px;
+}
+
+/* WBS final compact layout */
+.baseline-grid {
+  min-width: 1120px;
+}
+
+.baseline-grid th:nth-child(2),
+.baseline-grid td:nth-child(2) {
+  width: 110px;
+  min-width: 110px;
+}
+
+.baseline-grid th:nth-child(3),
+.baseline-grid td:nth-child(3) {
+  width: 420px;
+  min-width: 420px;
+}
+
+.baseline-grid th:nth-child(4),
+.baseline-grid td:nth-child(4) {
+  width: 140px;
+  min-width: 140px;
+}
+
+.baseline-grid th:nth-child(5),
+.baseline-grid td:nth-child(5) {
+  width: 65px;
+  min-width: 65px;
+}
+
+.baseline-grid th:nth-child(6),
+.baseline-grid td:nth-child(6) {
+  width: 95px;
+  min-width: 95px;
+}
+
+.baseline-grid th:nth-child(7),
+.baseline-grid td:nth-child(7) {
+  width: 85px;
+  min-width: 85px;
+}
+
+.baseline-grid th:nth-child(8),
+.baseline-grid td:nth-child(8),
+.baseline-grid th:nth-child(9),
+.baseline-grid td:nth-child(9) {
+  width: 120px;
+  min-width: 120px;
+}
+
+.baseline-activity-cell input {
+  min-width: 400px;
+}
