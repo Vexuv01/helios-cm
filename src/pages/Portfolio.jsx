@@ -5,6 +5,7 @@ import {
   removePortfolioProject,
   savePortfolioProject,
 } from "../features/portfolio/services/portfolioService";
+import { generateWeeklyManagementPpt } from "../features/reports/services/executiveReportService";
 import "../styles/portfolio.css";
 
 const EMPTY_FORM = {
@@ -330,9 +331,19 @@ export default function Portfolio() {
           </p>
         </div>
 
-        <button className="new-project-button" type="button" onClick={openCreateForm}>
-          + New Project
-        </button>
+        <div className="portfolio-hero-actions">
+          <button
+            className="secondary-button"
+            type="button"
+            onClick={generateWeeklyManagementPpt}
+          >
+            Export Weekly PPT
+          </button>
+
+          <button className="new-project-button" type="button" onClick={openCreateForm}>
+            + New Project
+          </button>
+        </div>
       </section>
 
       {error ? <div className="error-banner">{error}</div> : null}

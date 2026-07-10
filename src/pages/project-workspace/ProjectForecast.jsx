@@ -3,7 +3,6 @@ import { useParams } from "react-router-dom";
 import {
   activateRecoveryRevision,
   archiveRecoveryPlan,
-  createAndActivateRecoveryPlan,
   createRecoveryRevision,
   deleteRecoveryPlan,
   deleteRecoveryRevision,
