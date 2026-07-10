@@ -369,6 +369,7 @@ export default function ProjectForecast() {
 
       setSelectedRevisionId(created.id);
       await loadPage();
+      await loadPage();
     } catch (err) {
       window.alert(err.message || "Errore creazione Recovery Revision");
     }
