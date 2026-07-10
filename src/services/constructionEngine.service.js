@@ -129,10 +129,22 @@ async function loadWeeklyEntries(reportIds) {
 }
 
 async function loadRecoveryForecasts(projectId) {
-  const { data, error } = await supabase
-    .from("wbs_recovery_forecasts")
+  const { data: revisions, error: revisionsError } = await supabase
+    .from("recovery_plan_revisions")
     .select("*")
-    .eq("project_id", projectId);
+    .eq("project_id", projectId)
+    .order("revision_number", { ascending: false })
+    .limit(1);
+
+  if (revisionsError) throw new Error(revisionsError.message);
+
+  const latestRevision = revisions?.[0];
+  if (!latestRevision) return [];
+
+  const { data, error } = await supabase
+    .from("recovery_plan_items")
+    .select("*")
+    .eq("revision_id", latestRevision.id);
 
   if (error) throw new Error(error.message);
   return data || [];
