@@ -404,3 +404,121 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* WBS Excel-like readability sprint */
+.excel-shell {
+  overflow: auto;
+  max-height: calc(100vh - 360px);
+  border-radius: 18px;
+}
+
+.baseline-grid {
+  min-width: 1320px;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.baseline-grid thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  white-space: nowrap;
+}
+
+.baseline-grid th,
+.baseline-grid td {
+  vertical-align: middle;
+}
+
+.baseline-grid th:nth-child(1),
+.baseline-grid td:nth-child(1) {
+  width: 44px;
+  min-width: 44px;
+  text-align: center;
+}
+
+.baseline-grid th:nth-child(2),
+.baseline-grid td:nth-child(2) {
+  width: 130px;
+  min-width: 130px;
+}
+
+.baseline-grid th:nth-child(3),
+.baseline-grid td:nth-child(3) {
+  width: 170px;
+  min-width: 170px;
+}
+
+.baseline-grid th:nth-child(4),
+.baseline-grid td:nth-child(4) {
+  width: 360px;
+  min-width: 360px;
+}
+
+.baseline-grid th:nth-child(5),
+.baseline-grid td:nth-child(5) {
+  width: 90px;
+  min-width: 90px;
+}
+
+.baseline-grid th:nth-child(6),
+.baseline-grid td:nth-child(6),
+.baseline-grid th:nth-child(7),
+.baseline-grid td:nth-child(7) {
+  width: 130px;
+  min-width: 130px;
+}
+
+.baseline-grid th:nth-child(8),
+.baseline-grid td:nth-child(8),
+.baseline-grid th:nth-child(9),
+.baseline-grid td:nth-child(9) {
+  width: 150px;
+  min-width: 150px;
+}
+
+.baseline-grid th:nth-child(10),
+.baseline-grid td:nth-child(10) {
+  width: 150px;
+  min-width: 150px;
+}
+
+.baseline-grid th:nth-child(11),
+.baseline-grid td:nth-child(11) {
+  width: 90px;
+  min-width: 90px;
+}
+
+.baseline-grid input,
+.baseline-grid select {
+  width: 100%;
+  min-height: 34px;
+}
+
+.baseline-activity-cell input {
+  min-width: 340px;
+  font-weight: 600;
+}
+
+.cw-row-dirty td {
+  box-shadow: inset 3px 0 0 rgba(245, 158, 11, 0.85);
+}
+
+.baseline-toolbar {
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.baseline-toolbar input[type="text"],
+.baseline-toolbar > input:not([type]) {
+  min-width: 280px;
+}
+
+.baseline-toolbar select {
+  min-width: 180px;
+}
+
+.baseline-toolbar button {
+  white-space: nowrap;
+}
