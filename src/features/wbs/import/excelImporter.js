@@ -71,6 +71,20 @@ export async function importWbsExcelFile(projectId, file) {
 
   if (!confirmed) return null;
 
+  const deleteWeeklyEntries = await supabase
+    .from("weekly_entries")
+    .delete()
+    .eq("project_id", projectId);
+
+  if (deleteWeeklyEntries.error) throw new Error(deleteWeeklyEntries.error.message);
+
+  const deleteWeeklyReports = await supabase
+    .from("weekly_reports")
+    .delete()
+    .eq("project_id", projectId);
+
+  if (deleteWeeklyReports.error) throw new Error(deleteWeeklyReports.error.message);
+
   const deleteResult = await supabase
     .from("wbs_activities")
     .delete()
