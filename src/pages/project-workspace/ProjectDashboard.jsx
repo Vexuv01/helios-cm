@@ -14,6 +14,9 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import {
+  createAndActivateRecoveryPlan,
+} from "../../features/forecast/services/recoveryForecastService";
 import { supabase } from "../../lib/supabaseClient";
 import { loadRealConstructionDashboard } from "../../services/constructionEngine.service";
 import "../../styles/dashboard.css";
@@ -120,6 +123,17 @@ export default function ProjectDashboard() {
     }
   }, [loadDashboard, projectId]);
 
+  async function handleCreateRecoveryPlan() {
+    if (!projectId) return;
+
+    try {
+      await createAndActivateRecoveryPlan(projectId);
+      navigate(`/projects/${projectId}/forecast`);
+    } catch (err) {
+      window.alert(err.message || "Errore creazione Recovery Plan");
+    }
+  }
+
   function handleProjectChange(event) {
     const nextProjectId = event.target.value;
     setProjectId(nextProjectId);
@@ -158,6 +172,13 @@ export default function ProjectDashboard() {
 
           <Link to={`/projects/${projectId}/wbs`}>WBS</Link>
           <Link to={`/projects/${projectId}/weekly`}>Weekly</Link>
+          {dashboard?.recoveryPlan?.active ? (
+            <Link to={`/projects/${projectId}/forecast`}>Recovery</Link>
+          ) : (
+            <button type="button" onClick={handleCreateRecoveryPlan}>
+              + Recovery
+            </button>
+          )}
         </div>
       </header>
 

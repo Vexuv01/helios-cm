@@ -2,7 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import {
   activateRecoveryRevision,
+  archiveRecoveryPlan,
+  createAndActivateRecoveryPlan,
   createRecoveryRevision,
+  deleteRecoveryPlan,
   deleteRecoveryRevision,
   loadRecoveryItems,
   loadRecoveryRevisions,
@@ -194,7 +197,9 @@ export default function ProjectForecast() {
     setLoading(true);
 
     try {
-      let nextRevisions = await loadRecoveryRevisions(projectId);
+      let nextRevisions = (await loadRecoveryRevisions(projectId)).filter(
+        (revision) => revision.status !== "ARCHIVED"
+      );
 
       if (!nextRevisions.length) {
         setRevisions([]);
@@ -375,6 +380,44 @@ export default function ProjectForecast() {
     }
   }
 
+  async function handleArchiveRecoveryPlan() {
+    const confirmed = window.confirm(
+      "Archiviare il Recovery Plan? La tab Recovery verrà nascosta, ma lo storico resterà nel database."
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await archiveRecoveryPlan(projectId);
+      setSelectedRevisionId("");
+      await loadPage();
+    } catch (err) {
+      window.alert(err.message || "Errore archiviazione Recovery Plan");
+    }
+  }
+
+  async function handleDeleteRecoveryPlan() {
+    const confirmed = window.confirm(
+      "ATTENZIONE: eliminare definitivamente tutto il Recovery Plan del progetto?"
+    );
+
+    if (!confirmed) return;
+
+    const secondConfirm = window.confirm(
+      "Conferma definitiva: verranno eliminate tutte le revisioni Recovery e le relative date forecast."
+    );
+
+    if (!secondConfirm) return;
+
+    try {
+      await deleteRecoveryPlan(projectId);
+      setSelectedRevisionId("");
+      await loadPage();
+    } catch (err) {
+      window.alert(err.message || "Errore eliminazione Recovery Plan");
+    }
+  }
+
   async function handleDeleteRevision() {
     if (!selectedRevision) return;
 
@@ -414,6 +457,27 @@ export default function ProjectForecast() {
     return (
       <main className="forecast-page">
         <section className="forecast-empty">Loading Recovery Forecast...</section>
+      </main>
+    );
+  }
+
+  if (!selectedRevision) {
+    return (
+      <main className="forecast-page">
+        <section className="forecast-hero forecast-empty-state">
+          <div>
+            <span>Recovery Forecast</span>
+            <h1>No Recovery Plan</h1>
+            <p>
+              Il Recovery Plan è opzionale. Crealo solo quando il progetto è in ritardo
+              e vuoi richiedere all'EPC un piano di recupero separato dalla baseline WBS.
+            </p>
+          </div>
+
+          <button type="button" onClick={handleCreateRevision}>
+            Create Recovery Plan
+          </button>
+        </section>
       </main>
     );
   }
@@ -485,6 +549,14 @@ export default function ProjectForecast() {
 
           <button type="button" className="forecast-danger" onClick={handleDeleteRevision} disabled={revisions.length <= 1}>
             Delete Rev
+          </button>
+
+          <button type="button" className="forecast-danger" onClick={handleArchiveRecoveryPlan}>
+            Archive Plan
+          </button>
+
+          <button type="button" className="forecast-danger" onClick={handleDeleteRecoveryPlan}>
+            Delete Plan
           </button>
 
           <button type="button" onClick={handleSave} disabled={!canSave || saving}>

@@ -1,18 +1,54 @@
+import { useEffect, useMemo, useState } from "react";
 import { NavLink, Outlet, Link } from "react-router-dom";
 import { ProjectProvider } from "../context/ProjectContext";
 import { useProject } from "../context/useProject";
+import { hasOpenRecoveryPlan } from "../../forecast/services/recoveryForecastService";
 import "../../../styles/project-workspace.css";
 
-const workspaceTabs = [
+const baseWorkspaceTabs = [
   { label: "Control Room", path: "dashboard" },
   { label: "WBS Planning", path: "wbs" },
   { label: "Weekly Production", path: "weekly" },
-  { label: "Recovery Forecast", path: "forecast" },
   { label: "Documents", path: "documents" },
 ];
 
 function ProjectWorkspaceShell() {
   const { currentProject, projectLoading, projectError } = useProject();
+  const [recoveryVisible, setRecoveryVisible] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+
+    async function checkRecovery() {
+      if (!currentProject?.id) {
+        setRecoveryVisible(false);
+        return;
+      }
+
+      try {
+        const visible = await hasOpenRecoveryPlan(currentProject.id);
+        if (active) setRecoveryVisible(visible);
+      } catch {
+        if (active) setRecoveryVisible(false);
+      }
+    }
+
+    checkRecovery();
+
+    return () => {
+      active = false;
+    };
+  }, [currentProject?.id]);
+
+  const workspaceTabs = useMemo(() => {
+    if (!recoveryVisible) return baseWorkspaceTabs;
+
+    return [
+      ...baseWorkspaceTabs.slice(0, 3),
+      { label: "Recovery", path: "forecast" },
+      ...baseWorkspaceTabs.slice(3),
+    ];
+  }, [recoveryVisible]);
 
   if (projectLoading) {
     return (

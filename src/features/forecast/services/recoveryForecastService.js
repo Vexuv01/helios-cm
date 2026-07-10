@@ -164,3 +164,38 @@ export async function deleteRecoveryRevision(revisionId) {
   if (error) throw new Error(error.message);
   return revisionId;
 }
+
+
+export async function hasOpenRecoveryPlan(projectId) {
+  const revisions = await loadRecoveryRevisions(projectId);
+  return revisions.some((revision) => revision.status !== "ARCHIVED");
+}
+
+export async function createAndActivateRecoveryPlan(projectId) {
+  const revision = await createRecoveryRevision(projectId);
+  return activateRecoveryRevision(projectId, revision.id);
+}
+
+export async function archiveRecoveryPlan(projectId) {
+  if (!projectId) throw new Error("Project id is required");
+
+  const { error } = await supabase
+    .from("recovery_plan_revisions")
+    .update({ status: "ARCHIVED", updated_at: new Date().toISOString() })
+    .eq("project_id", projectId);
+
+  if (error) throw new Error(error.message);
+  return true;
+}
+
+export async function deleteRecoveryPlan(projectId) {
+  if (!projectId) throw new Error("Project id is required");
+
+  const { error } = await supabase
+    .from("recovery_plan_revisions")
+    .delete()
+    .eq("project_id", projectId);
+
+  if (error) throw new Error(error.message);
+  return true;
+}
