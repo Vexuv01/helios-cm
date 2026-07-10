@@ -24,6 +24,39 @@ function pct(value) {
   return `${Number(value || 0).toFixed(1)}%`;
 }
 
+function score(value) {
+  return Math.round(Number(value || 0));
+}
+
+function stateLabel(gap) {
+  if (Number(gap || 0) >= 0) return "ON / AHEAD";
+  return "BEHIND PLAN";
+}
+
+function CardHead({ eyebrow, title, action }) {
+  return (
+    <div className="dashboard-card-head">
+      <div>
+        <span>{eyebrow}</span>
+        <strong>{title}</strong>
+      </div>
+      {action ? <b>{action}</b> : null}
+    </div>
+  );
+}
+
+function ChartTooltip() {
+  return (
+    <Tooltip
+      contentStyle={{
+        background: "#020617",
+        border: "1px solid rgba(148,163,184,.25)",
+        borderRadius: 14,
+      }}
+    />
+  );
+}
+
 export default function ProjectDashboard() {
   const params = useParams();
   const navigate = useNavigate();
@@ -100,13 +133,11 @@ export default function ProjectDashboard() {
 
   return (
     <main className="dashboard-page">
-      <header className="dashboard-hero cinematic">
+      <header className="dashboard-hero">
         <div>
           <span>HELIOS CM Enterprise</span>
-          <h1>Construction Control Room</h1>
-          <p>
-            Vista decisionale da Baseline WBS programmata vs produzione Weekly reale.
-          </p>
+          <h1>{selectedProject ? `${selectedProject.code} · ${selectedProject.name}` : "Construction Control Room"}</h1>
+          <p>Executive view da WBS baseline, Weekly actual production e Construction Engine.</p>
         </div>
 
         <div className="dashboard-actions">
@@ -119,152 +150,146 @@ export default function ProjectDashboard() {
           </select>
 
           <button type="button" onClick={() => loadDashboard(projectId)}>
-            Refresh Dashboard
+            Refresh
           </button>
 
-          <Link to={`/projects/${projectId}/wbs`}>Manage Construction</Link>
+          <Link to={`/projects/${projectId}/wbs`}>WBS</Link>
+          <Link to={`/projects/${projectId}/weekly`}>Weekly</Link>
         </div>
       </header>
-
-      {selectedProject && (
-        <section className="control-kpis">
-          <div className="hero-kpi">
-            <span>Project</span>
-            <strong>{selectedProject.code}</strong>
-            <small>{selectedProject.name}</small>
-          </div>
-
-          {dashboard?.project?.status && (
-            <div className="hero-kpi">
-              <span>Status</span>
-              <strong>{dashboard.project.status}</strong>
-              <small>From Supabase project status</small>
-            </div>
-          )}
-
-          <div className="hero-kpi">
-            <span>Weekly Reports</span>
-            <strong>{dashboard?.weeklyReports || 0}</strong>
-            <small>Submitted / validated / approved</small>
-          </div>
-        </section>
-      )}
 
       {!dashboard ? (
         <section className="dashboard-empty">Nessun dato disponibile.</section>
       ) : (
         <>
-          <section className="control-kpis">
-            <div className="hero-kpi">
+          <section className="executive-strip">
+            <article className="executive-main-card">
               <span>Actual Progress</span>
               <strong>{pct(dashboard.totalProgress)}</strong>
-              <small>Solo da Weekly reali</small>
-            </div>
-
-            <div className="hero-kpi">
-              <span>Planned Progress</span>
-              <strong>{pct(dashboard.plannedProgress)}</strong>
-              <small>Da date e pesi della Baseline</small>
-            </div>
-
-            <div className="hero-kpi health">
-              <span>Schedule Variance</span>
-              <strong>{pct(dashboard.scheduleGap)}</strong>
-              <small>{dashboard.scheduleGap >= 0 ? "Ahead / aligned" : "Behind plan"}</small>
-            </div>
-
-            <div className="hero-kpi">
-              <span>Health Score</span>
-              <strong>{dashboard.healthScore}</strong>
-              <small>Calculated, not manual</small>
-            </div>
-
-            <div className="hero-kpi">
-              <span>Critical Activities</span>
-              <strong>{dashboard.criticalActivities.length}</strong>
-              <small>Actual behind planned</small>
-            </div>
-          </section>
-
-
-          <section className="control-kpis">
-            <div className="hero-kpi">
-              <span>Actual Source</span>
-              <strong>{dashboard.dataSource.actualSource}</strong>
-              <small>{dashboard.dataSource.weeklyReports} reports · {dashboard.dataSource.weeklyEntries} entries</small>
-            </div>
-
-            <div className="hero-kpi">
-              <span>Planned Source</span>
-              <strong>{dashboard.dataSource.schedulableActivities}/{dashboard.dataSource.wbsActivities}</strong>
-              <small>Schedulable activities · full dates {dashboard.dataSource.activitiesWithDates}</small>
-            </div>
-
-            <div className="hero-kpi">
-              <span>Started by Today</span>
-              <strong>{dashboard.dataSource.activitiesStartedByToday}</strong>
-              <small>Start {dashboard.dataSource.activitiesWithStart} · Finish {dashboard.dataSource.activitiesWithFinish}</small>
-            </div>
-
-            <div className="hero-kpi">
-              <span>Total Weight</span>
-              <strong>{dashboard.dataSource.totalWeight}%</strong>
-              <small>Weight totale della WBS</small>
-            </div>
-          </section>
-
-          <section className="chart-grid-main">
-            <div className="dashboard-card chart-card wide">
-              <div className="dashboard-card-head">
-                <div>
-                  <span>S-Curve</span>
-                  <strong>Planned WBS vs Weekly Actual</strong>
-                </div>
-                <b>{dashboard.scheduleGap >= 0 ? "ON / AHEAD" : "BEHIND PLAN"}</b>
+              <div className="progress-track">
+                <div style={{ width: `${Math.min(Math.max(Number(dashboard.totalProgress || 0), 0), 100)}%` }} />
               </div>
+              <small>Planned {pct(dashboard.plannedProgress)}</small>
+            </article>
 
-              <div className="chart-box large">
+            <article className="executive-metric">
+              <span>Variance</span>
+              <strong>{pct(dashboard.scheduleGap)}</strong>
+              <small>{stateLabel(dashboard.scheduleGap)}</small>
+            </article>
+
+            <article className="executive-metric">
+              <span>Health</span>
+              <strong>{score(dashboard.healthScore)}</strong>
+              <small>Calculated score</small>
+            </article>
+
+            <article className="executive-metric">
+              <span>Critical</span>
+              <strong>{dashboard.criticalActivities.length}</strong>
+              <small>Activities behind plan</small>
+            </article>
+
+            <article className="executive-metric">
+              <span>Weekly</span>
+              <strong>{dashboard.weeklyReports}</strong>
+              <small>{dashboard.weeklyEntries} entries</small>
+            </article>
+          </section>
+
+          <section className="dashboard-grid decision-grid">
+            <div className="dashboard-card">
+              <CardHead eyebrow="Today" title="Decision Feed" />
+              <div className="decision-list">
+                {dashboard.decisionFeed.map((item, index) => (
+                  <article key={`${item.title}-${index}`}>
+                    <span>{item.type}</span>
+                    <strong>{item.title}</strong>
+                    <p>{item.message}</p>
+                  </article>
+                ))}
+              </div>
+            </div>
+
+            <div className="dashboard-card">
+              <CardHead eyebrow="Action Required" title="Critical Activities" />
+              <div className="decision-list">
+                {dashboard.criticalActivities.length === 0 ? (
+                  <p>Nessuna attività critica rilevata.</p>
+                ) : (
+                  dashboard.criticalActivities.slice(0, 6).map((activity) => (
+                    <article key={activity.id}>
+                      <span>{activity.discipline}</span>
+                      <strong>
+                        {activity.code} · {activity.name}
+                      </strong>
+                      <p>
+                        Actual {pct(activity.actualProgress)} vs Planned {pct(activity.plannedProgress)}
+                      </p>
+                    </article>
+                  ))
+                )}
+              </div>
+            </div>
+          </section>
+
+          <section className="dashboard-card">
+            <CardHead
+              eyebrow="S-Curve"
+              title="Planned WBS vs Weekly Actual"
+              action={stateLabel(dashboard.scheduleGap)}
+            />
+
+            <div className="chart-box xl">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={dashboard.curve}>
+                  <CartesianGrid stroke="rgba(148,163,184,.12)" vertical={false} />
+                  <XAxis dataKey="week" stroke="#94a3b8" />
+                  <YAxis stroke="#94a3b8" domain={[0, 100]} />
+                  <ChartTooltip />
+                  <Area
+                    type="monotone"
+                    dataKey="planned"
+                    name="Planned"
+                    stroke="#38bdf8"
+                    fill="#38bdf833"
+                    strokeWidth={3}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="actual"
+                    name="Actual"
+                    stroke="#22c55e"
+                    fill="#22c55e33"
+                    strokeWidth={3}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </section>
+
+          <section className="dashboard-grid analytics-grid">
+            <div className="dashboard-card">
+              <CardHead eyebrow="Discipline" title="Actual Progress" />
+              <div className="chart-box">
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={dashboard.curve}>
-                    <CartesianGrid stroke="rgba(148,163,184,.12)" vertical={false} />
-                    <XAxis dataKey="week" stroke="#94a3b8" />
-                    <YAxis stroke="#94a3b8" domain={[0, 100]} />
-                    <Tooltip
-                      contentStyle={{
-                        background: "#020617",
-                        border: "1px solid rgba(148,163,184,.25)",
-                        borderRadius: 14,
-                      }}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="planned"
-                      name="Planned"
-                      stroke="#38bdf8"
-                      fill="#38bdf833"
-                      strokeWidth={3}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="actual"
-                      name="Actual"
-                      stroke="#22c55e"
-                      fill="#22c55e33"
-                      strokeWidth={3}
-                    />
-                  </AreaChart>
+                  <BarChart data={dashboard.disciplines} layout="vertical">
+                    <CartesianGrid stroke="rgba(148,163,184,.12)" horizontal={false} />
+                    <XAxis type="number" domain={[0, 100]} stroke="#94a3b8" />
+                    <YAxis type="category" dataKey="discipline" stroke="#94a3b8" width={105} />
+                    <ChartTooltip />
+                    <Bar dataKey="progress" name="Actual %" radius={[0, 10, 10, 0]}>
+                      {dashboard.disciplines.map((entry, index) => (
+                        <Cell key={entry.discipline} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Bar>
+                  </BarChart>
                 </ResponsiveContainer>
               </div>
             </div>
 
-            <div className="dashboard-card chart-card">
-              <div className="dashboard-card-head">
-                <div>
-                  <span>Weight</span>
-                  <strong>Distribution</strong>
-                </div>
-              </div>
-
+            <div className="dashboard-card">
+              <CardHead eyebrow="Weight" title="Distribution" />
               <div className="chart-box">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
@@ -280,95 +305,35 @@ export default function ProjectDashboard() {
                         <Cell key={entry.discipline} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>
-                    <Tooltip
-                      contentStyle={{
-                        background: "#020617",
-                        border: "1px solid rgba(148,163,184,.25)",
-                        borderRadius: 14,
-                      }}
-                    />
+                    <ChartTooltip />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
             </div>
           </section>
 
-          <section className="chart-grid-three">
-            <div className="dashboard-card chart-card">
-              <div className="dashboard-card-head">
-                <div>
-                  <span>Discipline</span>
-                  <strong>Actual Progress</strong>
-                </div>
+          <section className="dashboard-card technical-card">
+            <CardHead eyebrow="Data Source" title="Engine Inputs" />
+            <div className="data-source-grid">
+              <div>
+                <span>Actual Source</span>
+                <strong>{dashboard.dataSource.actualSource}</strong>
+                <small>{dashboard.dataSource.weeklyReports} reports · {dashboard.dataSource.weeklyEntries} entries</small>
               </div>
-
-              <div className="chart-box">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={dashboard.disciplines} layout="vertical">
-                    <CartesianGrid stroke="rgba(148,163,184,.12)" horizontal={false} />
-                    <XAxis type="number" domain={[0, 100]} stroke="#94a3b8" />
-                    <YAxis type="category" dataKey="discipline" stroke="#94a3b8" width={105} />
-                    <Tooltip
-                      contentStyle={{
-                        background: "#020617",
-                        border: "1px solid rgba(148,163,184,.25)",
-                        borderRadius: 14,
-                      }}
-                    />
-                    <Bar dataKey="progress" name="Actual %" radius={[0, 10, 10, 0]}>
-                      {dashboard.disciplines.map((entry, index) => (
-                        <Cell key={entry.discipline} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
+              <div>
+                <span>Planned Source</span>
+                <strong>{dashboard.dataSource.schedulableActivities}/{dashboard.dataSource.wbsActivities}</strong>
+                <small>Schedulable activities</small>
               </div>
-            </div>
-
-            <div className="dashboard-card">
-              <div className="dashboard-card-head">
-                <div>
-                  <span>Action Required</span>
-                  <strong>Critical Activities</strong>
-                </div>
+              <div>
+                <span>Started by Today</span>
+                <strong>{dashboard.dataSource.activitiesStartedByToday}</strong>
+                <small>Start {dashboard.dataSource.activitiesWithStart} · Finish {dashboard.dataSource.activitiesWithFinish}</small>
               </div>
-
-              <div className="decision-list">
-                {dashboard.criticalActivities.length === 0 ? (
-                  <p>Nessuna attività critica rilevata.</p>
-                ) : (
-                  dashboard.criticalActivities.slice(0, 6).map((activity) => (
-                    <article key={activity.id}>
-                      <span>{activity.discipline}</span>
-                      <strong>
-                        {activity.code} · {activity.name}
-                      </strong>
-                      <p>
-                        Actual {pct(activity.actualProgress)} vs Planned{" "}
-                        {pct(activity.plannedProgress)}
-                      </p>
-                    </article>
-                  ))
-                )}
-              </div>
-            </div>
-
-            <div className="dashboard-card">
-              <div className="dashboard-card-head">
-                <div>
-                  <span>Today</span>
-                  <strong>Decision Feed</strong>
-                </div>
-              </div>
-
-              <div className="decision-list">
-                {dashboard.decisionFeed.map((item, index) => (
-                  <article key={`${item.title}-${index}`}>
-                    <span>{item.type}</span>
-                    <strong>{item.title}</strong>
-                    <p>{item.message}</p>
-                  </article>
-                ))}
+              <div>
+                <span>Total Weight</span>
+                <strong>{dashboard.dataSource.totalWeight}%</strong>
+                <small>WBS total weight</small>
               </div>
             </div>
           </section>
