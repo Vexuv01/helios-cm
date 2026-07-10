@@ -1,6 +1,7 @@
 import { NavLink, Outlet, Link } from "react-router-dom";
 import { ProjectProvider } from "../context/ProjectContext";
 import { useProject } from "../context/useProject";
+import "../../../styles/project-workspace.css";
 
 const workspaceTabs = [
   { label: "Control Room", path: "dashboard" },
