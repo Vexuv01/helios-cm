@@ -283,6 +283,46 @@ export default function ProjectWeekly() {
     await loadWeekly();
   }
 
+  async function deleteCurrentWeekly() {
+    if (!report?.id) {
+      alert("Nessuna Weekly da eliminare per questa settimana.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Eliminare definitivamente la Weekly ${week.weekStart} / ${week.weekEnd}?`
+    );
+
+    if (!confirmed) return;
+
+    setSaving(true);
+
+    try {
+      const deleteEntries = await supabase
+        .from("weekly_entries")
+        .delete()
+        .eq("weekly_report_id", report.id);
+
+      if (deleteEntries.error) throw new Error(deleteEntries.error.message);
+
+      const deleteReport = await supabase
+        .from("weekly_reports")
+        .delete()
+        .eq("id", report.id);
+
+      if (deleteReport.error) throw new Error(deleteReport.error.message);
+
+      setReport(null);
+      setWeeklyValues({});
+      setCumulativeValues({});
+      await loadWeekly();
+    } catch (error) {
+      alert(error.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function submitWeekly() {
     if (weeklyTotal <= 0) {
       alert("Inserisci almeno una quantità prima del submit.");
@@ -356,6 +396,12 @@ export default function ProjectWeekly() {
           {locked && (
             <button type="button" className="cw-danger-action" onClick={unlockWeekly} disabled={saving}>
               Admin Unlock
+            </button>
+          )}
+
+          {report?.id && (
+            <button type="button" className="cw-danger-action" onClick={deleteCurrentWeekly} disabled={saving}>
+              Delete Weekly
             </button>
           )}
         </div>
