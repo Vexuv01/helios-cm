@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "../../lib/supabaseClient";
+import { importWbsExcelFile } from "../../features/wbs/import/excelImporter";
 import { buildWbsWeightModel } from "../../services/wbsWeightEngine";
 import "../../styles/construction-workspace.css";
 
@@ -396,13 +397,24 @@ export default function ConstructionWorkspace() {
           type="file"
           accept=".xlsx,.xls"
           style={{ display: "none" }}
-          onChange={(event) => {
+          onChange={async (event) => {
             const file = event.target.files?.[0];
             event.target.value = "";
             if (!file) return;
+
             setImportingExcel(true);
-            window.alert(`Excel selected: ${file.name}. Parser will be enabled in the next sprint.`);
-            setImportingExcel(false);
+
+            try {
+              const result = await importWbsExcelFile(projectId, file);
+              if (result) {
+                await loadWorkspace(projectId);
+                window.alert(`Import completato: ${result.activitiesCount} attività. Peso totale: ${result.totalWeight.toFixed(2)}%.`);
+              }
+            } catch (err) {
+              window.alert(err.message || "Errore import Excel WBS");
+            } finally {
+              setImportingExcel(false);
+            }
           }}
         />
 
