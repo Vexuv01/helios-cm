@@ -32,13 +32,6 @@ function formatMw(value) {
   return `${formatNumber(value, 2)} MW`;
 }
 
-function formatDate(value) {
-  if (!value) return "—";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleDateString("it-IT");
-}
-
 function KpiCard({ label, value, helper }) {
   return (
     <article className="kpi-card">
@@ -93,10 +86,7 @@ function ProjectCard({ project, onOpen, onEdit, onDelete }) {
       </div>
 
       <div className="project-executive-grid">
-        <div>
-          <span>Forecast COD</span>
-          <strong>{formatDate(executive.forecastCOD)}</strong>
-        </div>
+
         <div>
           <span>Variance</span>
           <strong>{formatNumber(delay)}%</strong>

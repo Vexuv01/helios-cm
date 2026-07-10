@@ -281,3 +281,27 @@
     height: 300px;
   }
 }
+
+.executive-metric.variance-good {
+  border-color: rgba(34, 197, 94, 0.45);
+}
+
+.executive-metric.variance-good strong {
+  color: #86efac;
+}
+
+.executive-metric.variance-warning {
+  border-color: rgba(245, 158, 11, 0.45);
+}
+
+.executive-metric.variance-warning strong {
+  color: #fde68a;
+}
+
+.executive-metric.variance-danger {
+  border-color: rgba(239, 68, 68, 0.50);
+}
+
+.executive-metric.variance-danger strong {
+  color: #fecaca;
+}

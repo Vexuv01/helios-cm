@@ -24,16 +24,16 @@ function pct(value) {
   return `${Number(value || 0).toFixed(1)}%`;
 }
 
-function formatDate(value) {
-  if (!value) return "—";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleDateString("it-IT");
-}
-
 function stateLabel(gap) {
   if (Number(gap || 0) >= 0) return "ON / AHEAD";
   return "BEHIND PLAN";
+}
+
+function varianceClass(value) {
+  const gap = Number(value || 0);
+  if (gap >= 0) return "variance-good";
+  if (gap >= -20) return "variance-warning";
+  return "variance-danger";
 }
 
 function CardHead({ eyebrow, title, action }) {
@@ -175,16 +175,10 @@ export default function ProjectDashboard() {
               <small>Planned {pct(dashboard.plannedProgress)}</small>
             </article>
 
-            <article className="executive-metric">
+            <article className={`executive-metric ${varianceClass(dashboard.scheduleGap)}`}>
               <span>Variance</span>
               <strong>{pct(dashboard.scheduleGap)}</strong>
               <small>{stateLabel(dashboard.scheduleGap)}</small>
-            </article>
-
-            <article className="executive-metric">
-              <span>Forecast COD</span>
-              <strong>{formatDate(dashboard.project?.forecastCOD || dashboard.project?.plannedCOD)}</strong>
-              <small>Planned COD {formatDate(dashboard.project?.plannedCOD)}</small>
             </article>
 
             <article className="executive-metric">
