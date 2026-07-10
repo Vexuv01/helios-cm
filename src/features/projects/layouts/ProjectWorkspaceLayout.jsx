@@ -7,6 +7,7 @@ const workspaceTabs = [
   { label: "Control Room", path: "dashboard" },
   { label: "WBS Planning", path: "wbs" },
   { label: "Weekly Production", path: "weekly" },
+  { label: "Recovery Forecast", path: "forecast" },
   { label: "Documents", path: "documents" },
 ];
 
