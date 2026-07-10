@@ -326,15 +326,16 @@ export default function ProjectDashboard() {
                       data={dashboard.weightDistribution}
                       dataKey="value"
                       nameKey="discipline"
-                      innerRadius={62}
-                      outerRadius={92}
-                      paddingAngle={5}
+                      innerRadius={54}
+                      outerRadius={82}
+                      paddingAngle={4}
+                      label={({ discipline, value }) => `${discipline}: ${Number(value).toFixed(1)}%`}
+                      labelLine
                     >
                       {dashboard.weightDistribution.map((entry, index) => (
                         <Cell key={entry.discipline} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>
-                    <ChartTooltip />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
