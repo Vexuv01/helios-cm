@@ -24,8 +24,11 @@ function pct(value) {
   return `${Number(value || 0).toFixed(1)}%`;
 }
 
-function score(value) {
-  return Math.round(Number(value || 0));
+function formatDate(value) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleDateString("it-IT");
 }
 
 function stateLabel(gap) {
@@ -179,9 +182,9 @@ export default function ProjectDashboard() {
             </article>
 
             <article className="executive-metric">
-              <span>Health</span>
-              <strong>{score(dashboard.healthScore)}</strong>
-              <small>Calculated score</small>
+              <span>Forecast COD</span>
+              <strong>{formatDate(dashboard.project?.forecastCOD || dashboard.project?.plannedCOD)}</strong>
+              <small>Planned COD {formatDate(dashboard.project?.plannedCOD)}</small>
             </article>
 
             <article className="executive-metric">

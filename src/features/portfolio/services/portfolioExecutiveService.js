@@ -33,6 +33,8 @@ function buildProjectExecutive(project, snapshot) {
       weeklyReports,
       weeklyEntries,
       risk: classifyRisk(snapshot),
+      forecastCOD: snapshot?.project?.forecastCOD || snapshot?.project?.plannedCOD || "",
+      plannedCOD: snapshot?.project?.plannedCOD || "",
       hasWeekly: weeklyReports > 0,
       dataSource: snapshot?.dataSource ?? null,
       decision: snapshot?.decisionFeed?.[0] ?? null,

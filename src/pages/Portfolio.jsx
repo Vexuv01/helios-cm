@@ -32,6 +32,13 @@ function formatMw(value) {
   return `${formatNumber(value, 2)} MW`;
 }
 
+function formatDate(value) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleDateString("it-IT");
+}
+
 function KpiCard({ label, value, helper }) {
   return (
     <article className="kpi-card">
@@ -87,8 +94,8 @@ function ProjectCard({ project, onOpen, onEdit, onDelete }) {
 
       <div className="project-executive-grid">
         <div>
-          <span>Health</span>
-          <strong>{Math.round(Number(executive.health || 0))}</strong>
+          <span>Forecast COD</span>
+          <strong>{formatDate(executive.forecastCOD)}</strong>
         </div>
         <div>
           <span>Variance</span>
@@ -470,11 +477,11 @@ export default function Portfolio() {
         <KpiCard label="Projects" value={portfolio.kpis.totalProjects} helper="Active portfolio" />
         <KpiCard label="Total MW DC" value={formatNumber(portfolio.kpis.totalMwDc, 2)} helper="Portfolio power" />
         <KpiCard label="Avg Progress" value={`${formatNumber(portfolio.kpis.avgProgress)}%`} helper="Engine actual" />
-        <KpiCard label="Avg Health" value={portfolio.kpis.avgHealth} helper="Construction health" />
+        
         <KpiCard label="At Risk" value={portfolio.kpis.projectsAtRisk} helper="High risk projects" />
         <KpiCard label="Delayed" value={portfolio.kpis.delayedProjects} helper="Negative variance" />
         <KpiCard label="No Weekly" value={portfolio.kpis.noWeekly} helper="Missing actuals" />
-        <KpiCard label="Engine Ready" value={portfolio.kpis.engineReady} helper="Snapshots loaded" />
+        
       </section>
 
       <section className="filters-bar">
