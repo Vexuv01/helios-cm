@@ -197,8 +197,13 @@ export default function ProjectForecast() {
       let nextRevisions = await loadRecoveryRevisions(projectId);
 
       if (!nextRevisions.length) {
-        const created = await createRecoveryRevision(projectId);
-        nextRevisions = [created];
+        setRevisions([]);
+        setSelectedRevisionId("");
+        setSelectedRevision(null);
+        setRows([]);
+        setDirtyIds(new Set());
+        setRevisionDirty(false);
+        return;
       }
 
       const nextSelectedRevision =
@@ -363,6 +368,7 @@ export default function ProjectForecast() {
       }
 
       setSelectedRevisionId(created.id);
+      await loadPage();
     } catch (err) {
       window.alert(err.message || "Errore creazione Recovery Revision");
     }
@@ -413,6 +419,27 @@ export default function ProjectForecast() {
 
   const canSave = dirtyIds.size > 0 || revisionDirty;
   const isActive = selectedRevision?.status === "ACTIVE";
+
+  if (!selectedRevision) {
+    return (
+      <main className="forecast-page">
+        <section className="forecast-hero forecast-empty-state">
+          <div>
+            <span>Recovery Forecast</span>
+            <h1>No Recovery Plan</h1>
+            <p>
+              Il Recovery Plan è opzionale. Crealo solo quando il progetto è in ritardo
+              e vuoi richiedere all'EPC un piano di recupero separato dalla baseline WBS.
+            </p>
+          </div>
+
+          <button type="button" onClick={handleCreateRevision}>
+            Create Recovery Plan
+          </button>
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main className="forecast-page">
