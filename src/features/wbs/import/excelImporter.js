@@ -53,10 +53,48 @@ function buildPreviewMessage(file, validation, activities) {
     "Preview:",
     previewRows || "No preview available",
     "",
-    "La WBS esistente del progetto corrente verrà sostituita.",
+    "La WBS esistente e le Weekly storiche del progetto corrente verranno sostituite.",
     "",
     "Procedere con l'import?"
   ].join("\n");
+}
+
+async function resetProjectWeekly(projectId) {
+  const { data: reports, error: reportsError } = await supabase
+    .from("weekly_reports")
+    .select("id")
+    .eq("project_id", projectId);
+
+  if (reportsError) throw new Error(reportsError.message);
+
+  const reportIds = (reports || []).map((report) => report.id);
+
+  if (reportIds.length > 0) {
+    const deleteEntriesByReport = await supabase
+      .from("weekly_entries")
+      .delete()
+      .in("weekly_report_id", reportIds);
+
+    if (deleteEntriesByReport.error) {
+      throw new Error(deleteEntriesByReport.error.message);
+    }
+  }
+
+  const deleteEntriesByProject = await supabase
+    .from("weekly_entries")
+    .delete()
+    .eq("project_id", projectId);
+
+  if (deleteEntriesByProject.error) {
+    throw new Error(deleteEntriesByProject.error.message);
+  }
+
+  const deleteReports = await supabase
+    .from("weekly_reports")
+    .delete()
+    .eq("project_id", projectId);
+
+  if (deleteReports.error) throw new Error(deleteReports.error.message);
 }
 
 export async function importWbsExcelFile(projectId, file) {
@@ -71,19 +109,7 @@ export async function importWbsExcelFile(projectId, file) {
 
   if (!confirmed) return null;
 
-  const deleteWeeklyEntries = await supabase
-    .from("weekly_entries")
-    .delete()
-    .eq("project_id", projectId);
-
-  if (deleteWeeklyEntries.error) throw new Error(deleteWeeklyEntries.error.message);
-
-  const deleteWeeklyReports = await supabase
-    .from("weekly_reports")
-    .delete()
-    .eq("project_id", projectId);
-
-  if (deleteWeeklyReports.error) throw new Error(deleteWeeklyReports.error.message);
+  await resetProjectWeekly(projectId);
 
   const deleteResult = await supabase
     .from("wbs_activities")
