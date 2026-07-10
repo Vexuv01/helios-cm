@@ -9,6 +9,11 @@ function normalizeRevision(row) {
     status: row.status || "DRAFT",
     issueDate: row.issue_date || "",
     generalNote: row.general_note || "",
+    actualProgressSnapshot: Number(row.actual_progress_snapshot || 0),
+    plannedProgressSnapshot: Number(row.planned_progress_snapshot || 0),
+    actualQtySnapshot: Number(row.actual_qty_snapshot || 0),
+    remainingQtySnapshot: Number(row.remaining_qty_snapshot || 0),
+    forecastFinishSnapshot: row.forecast_finish_snapshot || "",
   };
 }
 
@@ -68,6 +73,11 @@ export async function updateRecoveryRevision(revision) {
       status: revision.status || "DRAFT",
       issue_date: revision.issueDate || new Date().toISOString().slice(0, 10),
       general_note: revision.generalNote || null,
+      actual_progress_snapshot: Number(revision.actualProgressSnapshot || 0),
+      planned_progress_snapshot: Number(revision.plannedProgressSnapshot || 0),
+      actual_qty_snapshot: Number(revision.actualQtySnapshot || 0),
+      remaining_qty_snapshot: Number(revision.remainingQtySnapshot || 0),
+      forecast_finish_snapshot: revision.forecastFinishSnapshot || null,
       updated_at: new Date().toISOString(),
     })
     .eq("id", revision.id)
