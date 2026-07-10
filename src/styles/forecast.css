@@ -209,3 +209,50 @@
   color: #fecaca;
   font-weight: 900;
 }
+
+.clean-kpis {
+  grid-template-columns: repeat(6, 1fr);
+}
+
+.forecast-note-panel {
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 22px;
+  background: rgba(15, 23, 42, 0.72);
+  padding: 18px;
+}
+
+.forecast-note-panel label {
+  display: grid;
+  gap: 8px;
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.forecast-note-panel textarea {
+  min-height: 74px;
+  resize: vertical;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 16px;
+  background: rgba(15, 23, 42, 0.96);
+  color: #f8fafc;
+  padding: 12px;
+  outline: none;
+  font: inherit;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+@media (max-width: 1180px) {
+  .clean-kpis {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 760px) {
+  .clean-kpis {
+    grid-template-columns: 1fr;
+  }
+}

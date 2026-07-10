@@ -48,7 +48,6 @@ function buildActualQtyMap(entries) {
   return entries.reduce((acc, entry) => {
     const activityId = getEntryActivityId(entry);
     if (!activityId) return acc;
-
     acc[activityId] = toNumber(acc[activityId]) + getEntryQty(entry);
     return acc;
   }, {});
@@ -68,32 +67,9 @@ function buildRecentWeeklyQtyMap(reports, entries, weeksCount = 4) {
     .reduce((acc, entry) => {
       const activityId = getEntryActivityId(entry);
       if (!activityId) return acc;
-
       acc[activityId] = toNumber(acc[activityId]) + getEntryQty(entry) / divisor;
       return acc;
     }, {});
-}
-
-function productivityRisk(requiredWeekly, currentWeekly) {
-  const required = toNumber(requiredWeekly);
-  const current = toNumber(currentWeekly);
-
-  if (required <= 0) return "OK";
-  if (current >= required) return "OK";
-
-  const gap = ((required - current) / required) * 100;
-
-  if (gap <= 10) return "LOW";
-  if (gap <= 25) return "MEDIUM";
-  return "HIGH";
-}
-
-function productivityGap(requiredWeekly, currentWeekly) {
-  const required = toNumber(requiredWeekly);
-  const current = toNumber(currentWeekly);
-
-  if (required <= 0) return 0;
-  return Number((((required - current) / required) * 100).toFixed(1));
 }
 
 function daysBetween(start, finish) {
@@ -109,15 +85,34 @@ function remainingDays(forecastFinish) {
   return Math.max(0, daysBetween(iso(new Date()), forecastFinish));
 }
 
-function mergeRows(activities, forecasts, actualQtyMap, weeklyProductivityMap = {}) {
-  const forecastByActivity = new Map(forecasts.map((item) => [item.activityId, item]));
+function productivityGap(requiredWeekly, currentWeekly) {
+  const required = toNumber(requiredWeekly);
+  const current = toNumber(currentWeekly);
+  if (required <= 0) return 0;
+  return Number((((required - current) / required) * 100).toFixed(1));
+}
+
+function productivityRisk(requiredWeekly, currentWeekly) {
+  const required = toNumber(requiredWeekly);
+  const current = toNumber(currentWeekly);
+
+  if (required <= 0) return "OK";
+  if (current >= required) return "OK";
+
+  const gap = ((required - current) / required) * 100;
+  if (gap <= 10) return "LOW";
+  if (gap <= 25) return "MEDIUM";
+  return "HIGH";
+}
+
+function mergeRows(activities, forecastItems, actualQtyMap, weeklyProductivityMap = {}) {
+  const forecastByActivity = new Map(forecastItems.map((item) => [item.activityId, item]));
 
   return activities.map((activity) => {
     const forecast = forecastByActivity.get(activity.id);
     const baselineQuantity = toNumber(activity.baseline_quantity);
     const actualQuantity = toNumber(actualQtyMap[activity.id]);
     const remainingQuantity = Math.max(0, baselineQuantity - actualQuantity);
-    const currentWeeklyProductivity = Number(toNumber(weeklyProductivityMap[activity.id]).toFixed(2));
 
     return {
       activityId: activity.id,
@@ -128,14 +123,13 @@ function mergeRows(activities, forecasts, actualQtyMap, weeklyProductivityMap = 
       baselineQuantity,
       actualQuantity,
       remainingQuantity,
-      currentWeeklyProductivity,
+      currentWeeklyProductivity: Number(toNumber(weeklyProductivityMap[activity.id]).toFixed(2)),
       weightPercent: toNumber(activity.weight_percent),
       plannedStart: iso(activity.planned_start),
       plannedFinish: iso(activity.planned_finish),
       forecastStart: forecast?.forecastStart || "",
       forecastFinish: forecast?.forecastFinish || "",
       forecastNote: forecast?.forecastNote || "",
-      status: forecast?.status || "DRAFT",
       sortOrder: toNumber(activity.sort_order),
     };
   });
@@ -148,6 +142,7 @@ export default function ProjectForecast() {
   const [revisions, setRevisions] = useState([]);
   const [selectedRevisionId, setSelectedRevisionId] = useState("");
   const [selectedRevision, setSelectedRevision] = useState(null);
+  const [revisionDirty, setRevisionDirty] = useState(false);
   const [rows, setRows] = useState([]);
   const [dirtyIds, setDirtyIds] = useState(new Set());
   const [loading, setLoading] = useState(true);
@@ -166,11 +161,7 @@ export default function ProjectForecast() {
     const totalActualQty = rows.reduce((sum, row) => sum + toNumber(row.actualQuantity), 0);
     const totalRemainingQty = rows.reduce((sum, row) => sum + toNumber(row.remainingQuantity), 0);
 
-    const baselineFinish = rows
-      .map((row) => row.plannedFinish)
-      .filter(Boolean)
-      .sort()
-      .at(-1);
+    const baselineFinish = rows.map((row) => row.plannedFinish).filter(Boolean).sort().at(-1);
 
     const forecastFinish = rows
       .map((row) => row.forecastFinish || row.plannedFinish)
@@ -226,10 +217,7 @@ export default function ProjectForecast() {
           .eq("is_group", false)
           .order("sort_order", { ascending: true })
           .order("code", { ascending: true }),
-        supabase
-          .from("weekly_reports")
-          .select("*")
-          .eq("project_id", projectId),
+        supabase.from("weekly_reports").select("*").eq("project_id", projectId),
         loadRecoveryItems(nextSelectedRevision.id),
       ]);
 
@@ -258,6 +246,7 @@ export default function ProjectForecast() {
       setSelectedRevision(nextSelectedRevision);
       setRows(mergeRows(activities || [], forecastItems, actualQtyMap, weeklyProductivityMap));
       setDirtyIds(new Set());
+      setRevisionDirty(false);
     } catch (err) {
       window.alert(err.message || "Errore caricamento Recovery Forecast");
     } finally {
@@ -274,6 +263,11 @@ export default function ProjectForecast() {
       current.map((row) => (row.activityId === activityId ? { ...row, [field]: value } : row))
     );
     setDirtyIds((current) => new Set([...current, activityId]));
+  }
+
+  function updateRevision(field, value) {
+    setSelectedRevision((current) => ({ ...current, [field]: value }));
+    setRevisionDirty(true);
   }
 
   function copyBaselineDates(activityId) {
@@ -309,15 +303,12 @@ export default function ProjectForecast() {
       const finish = row.plannedFinish ? new Date(`${row.plannedFinish}T12:00:00`) : null;
       const weight = toNumber(row.weightPercent);
 
-      if (!start || !finish || Number.isNaN(start.getTime()) || Number.isNaN(finish.getTime())) {
-        return sum;
-      }
+      if (!start || !finish || Number.isNaN(start.getTime()) || Number.isNaN(finish.getTime())) return sum;
 
       let progress = 0;
 
-      if (today >= finish) {
-        progress = 100;
-      } else if (today > start) {
+      if (today >= finish) progress = 100;
+      else if (today > start) {
         const totalMs = finish.getTime() - start.getTime();
         const elapsedMs = today.getTime() - start.getTime();
         progress = totalMs > 0 ? Math.min(Math.max((elapsedMs / totalMs) * 100, 0), 100) : 100;
@@ -326,51 +317,34 @@ export default function ProjectForecast() {
       return sum + (progress / 100) * weight;
     }, 0);
 
-    const actualProgressSnapshot =
-      totalWeight > 0 ? Number(((actualWeighted / totalWeight) * 100).toFixed(1)) : 0;
-
-    const plannedProgressSnapshot =
-      totalWeight > 0 ? Number(((plannedWeighted / totalWeight) * 100).toFixed(1)) : 0;
-
-    const actualQtySnapshot = Number(
-      rows.reduce((sum, row) => sum + toNumber(row.actualQuantity), 0).toFixed(2)
-    );
-
-    const remainingQtySnapshot = Number(
-      rows.reduce((sum, row) => sum + toNumber(row.remainingQuantity), 0).toFixed(2)
-    );
-
-    const forecastFinishSnapshot =
-      rows
-        .map((row) => row.forecastFinish || row.plannedFinish)
-        .filter(Boolean)
-        .sort()
-        .at(-1) || "";
-
     return {
-      actualProgressSnapshot,
-      plannedProgressSnapshot,
-      actualQtySnapshot,
-      remainingQtySnapshot,
-      forecastFinishSnapshot,
+      actualProgressSnapshot: totalWeight > 0 ? Number(((actualWeighted / totalWeight) * 100).toFixed(1)) : 0,
+      plannedProgressSnapshot: totalWeight > 0 ? Number(((plannedWeighted / totalWeight) * 100).toFixed(1)) : 0,
+      actualQtySnapshot: Number(rows.reduce((sum, row) => sum + toNumber(row.actualQuantity), 0).toFixed(2)),
+      remainingQtySnapshot: Number(rows.reduce((sum, row) => sum + toNumber(row.remainingQuantity), 0).toFixed(2)),
+      forecastFinishSnapshot:
+        rows.map((row) => row.forecastFinish || row.plannedFinish).filter(Boolean).sort().at(-1) || "",
     };
   }
 
   async function handleSave() {
-    const dirtyRows = rows.filter((row) => dirtyIds.has(row.activityId));
-
-    if (!dirtyRows.length) return;
+    if (!selectedRevision) return;
 
     setSaving(true);
 
     try {
+      const dirtyRows = rows.filter((row) => dirtyIds.has(row.activityId));
       const revisionWithSnapshot = {
         ...selectedRevision,
         ...buildRevisionSnapshot(),
       };
 
-      await updateRecoveryRevision(revisionWithSnapshot);
-      await saveRecoveryItems(revisionWithSnapshot, dirtyRows);
+      const updatedRevision = await updateRecoveryRevision(revisionWithSnapshot);
+
+      if (dirtyRows.length) {
+        await saveRecoveryItems(updatedRevision, dirtyRows);
+      }
+
       await loadPage();
     } catch (err) {
       window.alert(err.message || "Errore salvataggio Recovery Forecast");
@@ -383,7 +357,7 @@ export default function ProjectForecast() {
     try {
       const created = await createRecoveryRevision(projectId);
 
-      if (selectedRevision) {
+      if (selectedRevision && rows.length) {
         await saveRecoveryItems(created, rows);
       }
 
@@ -404,10 +378,6 @@ export default function ProjectForecast() {
     }
   }
 
-  function updateRevision(field, value) {
-    setSelectedRevision((current) => ({ ...current, [field]: value }));
-  }
-
   if (loading) {
     return (
       <main className="forecast-page">
@@ -415,6 +385,9 @@ export default function ProjectForecast() {
       </main>
     );
   }
+
+  const canSave = dirtyIds.size > 0 || revisionDirty;
+  const isActive = selectedRevision?.status === "ACTIVE";
 
   return (
     <main className="forecast-page">
@@ -429,16 +402,19 @@ export default function ProjectForecast() {
         </div>
 
         <div className="forecast-actions">
-          <select
-            value={selectedRevisionId}
-            onChange={(event) => setSelectedRevisionId(event.target.value)}
-          >
+          <select value={selectedRevisionId} onChange={(event) => setSelectedRevisionId(event.target.value)}>
             {revisions.map((revision) => (
               <option key={revision.id} value={revision.id}>
                 Rev.{revision.revisionNumber} · {revision.status}
               </option>
             ))}
           </select>
+
+          <input
+            value={selectedRevision?.title || ""}
+            onChange={(event) => updateRevision("title", event.target.value)}
+            placeholder="Revision title"
+          />
 
           <input
             type="date"
@@ -450,17 +426,28 @@ export default function ProjectForecast() {
             + New Rev
           </button>
 
-          <button type="button" onClick={handleActivateRevision}>
-            Set Active
+          <button type="button" onClick={handleActivateRevision} disabled={isActive}>
+            {isActive ? "Active" : "Set Active"}
           </button>
 
-          <button type="button" onClick={handleSave} disabled={dirtyIds.size === 0 || saving}>
+          <button type="button" onClick={handleSave} disabled={!canSave || saving}>
             {saving ? "Saving..." : `Save (${dirtyIds.size})`}
           </button>
         </div>
       </header>
 
-      <section className="forecast-kpis">
+      <section className="forecast-note-panel">
+        <label>
+          Revision Note
+          <textarea
+            value={selectedRevision?.generalNote || ""}
+            onChange={(event) => updateRevision("generalNote", event.target.value)}
+            placeholder="General recovery strategy, assumptions, constraints..."
+          />
+        </label>
+      </section>
+
+      <section className="forecast-kpis clean-kpis">
         <article>
           <span>Activities</span>
           <strong>{metrics.totalActivities}</strong>
@@ -485,21 +472,6 @@ export default function ProjectForecast() {
           <span>Forecast Finish</span>
           <strong>{metrics.forecastFinish}</strong>
           <small>Baseline finish {metrics.baselineFinish}</small>
-        </article>
-        <article>
-          <span>Snapshot</span>
-          <strong>{selectedRevision?.actualProgressSnapshot ?? 0}%</strong>
-          <small>Actual at issue date</small>
-        </article>
-        <article>
-          <span>Recovery Risk</span>
-          <strong>{metrics.highRiskActivities}</strong>
-          <small>High risk activities</small>
-        </article>
-        <article>
-          <span>Snapshot</span>
-          <strong>{selectedRevision?.actualProgressSnapshot ?? 0}%</strong>
-          <small>Actual at issue date</small>
         </article>
         <article>
           <span>Recovery Risk</span>
