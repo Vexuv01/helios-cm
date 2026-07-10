@@ -197,21 +197,37 @@ function calculatePlannedAtPortfolio(activities, date) {
   return totalWeight > 0 ? round((plannedWeight / totalWeight) * 100) : 0;
 }
 
-function calculateForecastAt(activity, date) {
-  const forecastActivity = {
-    ...activity,
-    plannedStart: activity.forecastStart || activity.plannedStart,
-    plannedFinish: activity.forecastFinish || activity.plannedFinish,
-  };
+function calculateForecastAt(activity, date, recoveryAnchorDate = new Date()) {
+  const baseline = n(activity.baselineQuantity);
+  const installed = n(activity.installedQuantity);
+  const actualProgress = baseline > 0 ? Math.min((installed / baseline) * 100, 100) : 0;
 
-  return calculatePlannedAt(forecastActivity, date);
+  const forecastStart = toDate(activity.forecastStart || activity.plannedStart);
+  const forecastFinish = toDate(activity.forecastFinish || activity.plannedFinish);
+
+  if (!forecastStart || !forecastFinish) return actualProgress;
+
+  const anchor =
+    forecastStart > recoveryAnchorDate ? forecastStart : recoveryAnchorDate;
+
+  if (date <= recoveryAnchorDate) return actualProgress;
+  if (date < anchor) return actualProgress;
+  if (date >= forecastFinish) return 100;
+
+  const totalMs = forecastFinish.getTime() - anchor.getTime();
+  const elapsedMs = date.getTime() - anchor.getTime();
+
+  if (totalMs <= 0) return 100;
+
+  const recoveryRatio = Math.min(Math.max(elapsedMs / totalMs, 0), 1);
+  return actualProgress + (100 - actualProgress) * recoveryRatio;
 }
 
-function calculateForecastAtPortfolio(activities, date) {
+function calculateForecastAtPortfolio(activities, date, recoveryAnchorDate = new Date()) {
   const totalWeight = activities.reduce((sum, activity) => sum + n(activity.weightPercent), 0);
 
   const forecastWeight = activities.reduce((sum, activity) => {
-    const forecast = calculateForecastAt(activity, date);
+    const forecast = calculateForecastAt(activity, date, recoveryAnchorDate);
     return sum + (forecast / 100) * n(activity.weightPercent);
   }, 0);
 
@@ -257,7 +273,10 @@ function buildCurve({ activities, reports, entries, plannedProgress, actualProgr
     };
 
     if (hasRecoveryForecast) {
-      point.forecast = calculateForecastAtPortfolio(activities, cursor);
+      point.forecast =
+        cursor <= new Date()
+          ? point.actual
+          : calculateForecastAtPortfolio(activities, cursor, new Date());
     }
 
     points.push(point);
@@ -271,7 +290,7 @@ function buildCurve({ activities, reports, entries, plannedProgress, actualProgr
   };
 
   if (hasRecoveryForecast) {
-    todayPoint.forecast = calculateForecastAtPortfolio(activities, new Date());
+    todayPoint.forecast = actualProgress;
   }
 
   points.push(todayPoint);
