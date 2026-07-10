@@ -166,10 +166,15 @@ export default function ProjectWeekly() {
       entries = entryRows || [];
     }
 
+    const validActivityIds = new Set((wbsRows || []).map((activity) => activity.id));
+    const validEntries = entries.filter((entry) => validActivityIds.has(getEntryActivityId(entry)));
+    const validReportIds = new Set(validEntries.map((entry) => entry.weekly_report_id));
+    const visibleReports = nextReports.filter((item) => validReportIds.has(item.id) || item.id === currentReport?.id);
+
     const currentValues = {};
     const cumulative = {};
 
-    entries.forEach((entry) => {
+    validEntries.forEach((entry) => {
       const activityId = getEntryActivityId(entry);
       if (!activityId) return;
 
@@ -185,7 +190,7 @@ export default function ProjectWeekly() {
       }
     });
 
-    setReports(nextReports);
+    setReports(visibleReports);
     setReport(currentReport);
     setActivities(wbsRows || []);
     setWeeklyValues(currentValues);
