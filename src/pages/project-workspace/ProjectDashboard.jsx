@@ -260,6 +260,17 @@ export default function ProjectDashboard() {
                     fill="#22c55e33"
                     strokeWidth={3}
                   />
+                  {dashboard.hasRecoveryForecast ? (
+                    <Area
+                      type="monotone"
+                      dataKey="forecast"
+                      name="Recovery Forecast"
+                      stroke="#f59e0b"
+                      fill="#f59e0b22"
+                      strokeWidth={3}
+                      strokeDasharray="6 4"
+                    />
+                  ) : null}
                 </AreaChart>
               </ResponsiveContainer>
             </div>

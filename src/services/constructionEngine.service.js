@@ -50,7 +50,7 @@ function isActualReport(report) {
   return ACTUAL_WEEKLY_STATUSES.has(String(report.status || "").toUpperCase());
 }
 
-function normalizeActivity(row, installedQuantity) {
+function normalizeActivity(row, installedQuantity, forecast = null) {
   return {
     id: row.id,
     projectId: row.project_id,
@@ -63,6 +63,9 @@ function normalizeActivity(row, installedQuantity) {
     weightPercent: n(row.weight_percent),
     plannedStart: iso(row.planned_start),
     plannedFinish: iso(row.planned_finish),
+    forecastStart: iso(forecast?.forecast_start),
+    forecastFinish: iso(forecast?.forecast_finish),
+    forecastNote: forecast?.forecast_note || "",
     actualStart: iso(row.actual_start),
     actualFinish: iso(row.actual_finish),
     status: row.status || "BASELINE",
@@ -120,6 +123,16 @@ async function loadWeeklyEntries(reportIds) {
     .from("weekly_entries")
     .select("*")
     .in("weekly_report_id", reportIds);
+
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+async function loadRecoveryForecasts(projectId) {
+  const { data, error } = await supabase
+    .from("wbs_recovery_forecasts")
+    .select("*")
+    .eq("project_id", projectId);
 
   if (error) throw new Error(error.message);
   return data || [];
@@ -184,15 +197,51 @@ function calculatePlannedAtPortfolio(activities, date) {
   return totalWeight > 0 ? round((plannedWeight / totalWeight) * 100) : 0;
 }
 
+function calculateForecastAt(activity, date) {
+  const forecastActivity = {
+    ...activity,
+    plannedStart: activity.forecastStart || activity.plannedStart,
+    plannedFinish: activity.forecastFinish || activity.plannedFinish,
+  };
+
+  return calculatePlannedAt(forecastActivity, date);
+}
+
+function calculateForecastAtPortfolio(activities, date) {
+  const totalWeight = activities.reduce((sum, activity) => sum + n(activity.weightPercent), 0);
+
+  const forecastWeight = activities.reduce((sum, activity) => {
+    const forecast = calculateForecastAt(activity, date);
+    return sum + (forecast / 100) * n(activity.weightPercent);
+  }, 0);
+
+  return totalWeight > 0 ? round((forecastWeight / totalWeight) * 100) : 0;
+}
+
 function buildCurve({ activities, reports, entries, plannedProgress, actualProgress }) {
-  const datedActivities = activities.filter((activity) => activity.plannedStart && activity.plannedFinish);
+  const hasRecoveryForecast = activities.some(
+    (activity) => activity.forecastStart && activity.forecastFinish
+  );
+
+  const datedActivities = activities.filter(
+    (activity) =>
+      (activity.plannedStart && activity.plannedFinish) ||
+      (activity.forecastStart && activity.forecastFinish)
+  );
 
   if (!datedActivities.length) {
     return [{ week: "Today", planned: plannedProgress, actual: actualProgress }];
   }
 
-  const starts = datedActivities.map((activity) => toDate(activity.plannedStart)).filter(Boolean);
-  const finishes = datedActivities.map((activity) => toDate(activity.plannedFinish)).filter(Boolean);
+  const starts = datedActivities
+    .flatMap((activity) => [activity.plannedStart, activity.forecastStart])
+    .map(toDate)
+    .filter(Boolean);
+
+  const finishes = datedActivities
+    .flatMap((activity) => [activity.plannedFinish, activity.forecastFinish])
+    .map(toDate)
+    .filter(Boolean);
 
   const minDate = new Date(Math.min(...starts.map((date) => date.getTime())));
   const maxDate = new Date(Math.max(...finishes.map((date) => date.getTime())));
@@ -200,25 +249,42 @@ function buildCurve({ activities, reports, entries, plannedProgress, actualProgr
   const points = [];
   let cursor = minDate;
 
-  while (cursor <= maxDate && points.length < 80) {
-    points.push({
+  while (cursor <= maxDate && points.length < 120) {
+    const point = {
       week: iso(cursor),
       planned: calculatePlannedAtPortfolio(activities, cursor),
       actual: calculateActualAt({ activities, reports, entries, date: cursor }),
-    });
+    };
 
+    if (hasRecoveryForecast) {
+      point.forecast = calculateForecastAtPortfolio(activities, cursor);
+    }
+
+    points.push(point);
     cursor = addDays(cursor, 7);
   }
 
-  points.push({
+  const todayPoint = {
     week: "Today",
     planned: plannedProgress,
     actual: actualProgress,
-  });
+  };
+
+  if (hasRecoveryForecast) {
+    todayPoint.forecast = calculateForecastAtPortfolio(activities, new Date());
+  }
+
+  points.push(todayPoint);
 
   return points.filter((point, index, all) => {
     if (point.week === "Today") return true;
-    return index === 0 || point.planned !== all[index - 1].planned || point.actual !== all[index - 1].actual;
+    const previous = all[index - 1];
+    return (
+      index === 0 ||
+      point.planned !== previous.planned ||
+      point.actual !== previous.actual ||
+      point.forecast !== previous.forecast
+    );
   });
 }
 
@@ -279,6 +345,7 @@ function toDashboard({ project, rawActivities, activities, reports, actualReport
     blocked: activities.filter((activity) => String(activity.status || "").toLowerCase() === "blocked").length,
     criticalActivities,
     disciplines,
+    hasRecoveryForecast: activities.some((activity) => activity.forecastStart && activity.forecastFinish),
     curve: buildCurve({ activities, reports, entries, plannedProgress, actualProgress: totalProgress }),
 
     weightDistribution: disciplines.map((item) => ({
@@ -317,19 +384,24 @@ function toDashboard({ project, rawActivities, activities, reports, actualReport
 export async function loadRealConstructionDashboard(projectId) {
   if (!projectId) throw new Error("Project id is required");
 
-  const [project, rawActivities, reports] = await Promise.all([
+  const [project, rawActivities, reports, recoveryForecasts] = await Promise.all([
     loadProject(projectId),
     loadWbsActivities(projectId),
     loadWeeklyReports(projectId),
+    loadRecoveryForecasts(projectId),
   ]);
 
   const actualReports = reports.filter(isActualReport);
   const entries = await loadWeeklyEntries(actualReports.map((report) => report.id));
   const installedMap = buildInstalledMap(entries);
+  const forecastMap = recoveryForecasts.reduce((acc, forecast) => {
+    acc[forecast.wbs_activity_id] = forecast;
+    return acc;
+  }, {});
 
   const activities = rawActivities
     .filter((activity) => activity.is_group !== true)
-    .map((activity) => normalizeActivity(activity, installedMap[activity.id]));
+    .map((activity) => normalizeActivity(activity, installedMap[activity.id], forecastMap[activity.id]));
 
   const engine = runConstructionEngine({
     project,
