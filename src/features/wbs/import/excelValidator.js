@@ -10,8 +10,18 @@ export function validateWbsActivities(activities) {
     const row = index + 2;
     const codeKey = String(activity.code || "").trim().toUpperCase();
 
-    if (!activity.code) errors.push(`Riga ${row}: codice mancante.`);
-    if (!activity.name) errors.push(`Riga ${row}: nome attività mancante.`);
+    if (!activity.code) errors.push(`Riga ${row}: Code mancante.`);
+    if (!activity.discipline) errors.push(`Riga ${row}: Discipline mancante.`);
+    if (!activity.name) errors.push(`Riga ${row}: Activity mancante.`);
+    if (!activity.unit) errors.push(`Riga ${row}: Unit mancante.`);
+    if (Number(activity.baselineQuantity || 0) <= 0) {
+      errors.push(`Riga ${row}: Baseline Qty deve essere maggiore di 0.`);
+    }
+    if (Number(activity.weightPercent || 0) <= 0) {
+      errors.push(`Riga ${row}: Weight % deve essere maggiore di 0.`);
+    }
+    if (!activity.plannedStart) errors.push(`Riga ${row}: Planned Start mancante o non valido.`);
+    if (!activity.plannedFinish) errors.push(`Riga ${row}: Planned Finish mancante o non valido.`);
 
     if (codes.has(codeKey)) {
       errors.push(`Riga ${row}: codice duplicato ${activity.code}.`);

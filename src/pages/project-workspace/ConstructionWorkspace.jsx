@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "../../lib/supabaseClient";
 import { importWbsExcelFile } from "../../features/wbs/import/excelImporter";
+import { downloadWbsTemplate } from "../../features/wbs/import/templateDownloader";
 import { buildWbsWeightModel } from "../../services/wbsWeightEngine";
 import "../../styles/construction-workspace.css";
 
@@ -424,7 +425,11 @@ export default function ConstructionWorkspace() {
           onClick={() => excelInputRef.current?.click()}
           disabled={importingExcel}
         >
-          {importingExcel ? "Reading Excel..." : "Import Excel"}
+          {importingExcel ? "Reading Excel..." : "Import WBS"}
+        </button>
+
+        <button type="button" className="cw-secondary-action" onClick={downloadWbsTemplate}>
+          Download Template
         </button>
 
         <button type="button" className="cw-danger-action" onClick={deleteSelectedActivities} disabled={selectedIds.size === 0}>
