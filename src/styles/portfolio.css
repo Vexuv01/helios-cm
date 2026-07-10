@@ -474,3 +474,22 @@
 .portfolio-hero-actions .new-project-button {
   white-space: nowrap;
 }
+
+.portfolio-page {
+  padding-top: 5.5rem;
+}
+
+.portfolio-hero {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.25rem;
+}
+
+.portfolio-hero-actions {
+  width: 100%;
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 0;
+}
