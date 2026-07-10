@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import {
   activateRecoveryRevision,
   createRecoveryRevision,
+  deleteRecoveryRevision,
   loadRecoveryItems,
   loadRecoveryRevisions,
   saveRecoveryItems,
@@ -367,6 +368,30 @@ export default function ProjectForecast() {
     }
   }
 
+  async function handleDeleteRevision() {
+    if (!selectedRevision) return;
+
+    if (revisions.length <= 1) {
+      window.alert("Non puoi eliminare l'unica Recovery Revision del progetto.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Eliminare definitivamente Rev.${selectedRevision.revisionNumber} · ${selectedRevision.title}?`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await deleteRecoveryRevision(selectedRevision.id);
+      const remaining = revisions.filter((revision) => revision.id !== selectedRevision.id);
+      setSelectedRevisionId(remaining[0]?.id || "");
+      await loadPage();
+    } catch (err) {
+      window.alert(err.message || "Errore eliminazione Recovery Revision");
+    }
+  }
+
   async function handleActivateRevision() {
     if (!selectedRevision) return;
 
@@ -428,6 +453,10 @@ export default function ProjectForecast() {
 
           <button type="button" onClick={handleActivateRevision} disabled={isActive}>
             {isActive ? "Active" : "Set Active"}
+          </button>
+
+          <button type="button" className="forecast-danger" onClick={handleDeleteRevision} disabled={revisions.length <= 1}>
+            Delete Rev
           </button>
 
           <button type="button" onClick={handleSave} disabled={!canSave || saving}>

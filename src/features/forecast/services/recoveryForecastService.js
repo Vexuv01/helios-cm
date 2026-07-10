@@ -151,3 +151,16 @@ export async function loadActiveRecoveryRevision(projectId) {
   const revisions = await loadRecoveryRevisions(projectId);
   return revisions.find((item) => item.status === "ACTIVE") || revisions[0] || null;
 }
+
+
+export async function deleteRecoveryRevision(revisionId) {
+  if (!revisionId) throw new Error("Recovery revision is required");
+
+  const { error } = await supabase
+    .from("recovery_plan_revisions")
+    .delete()
+    .eq("id", revisionId);
+
+  if (error) throw new Error(error.message);
+  return revisionId;
+}
