@@ -205,6 +205,20 @@ export default function ConstructionWorkspace() {
       (activity) => activity.discipline === newActivityCategory
     ).length;
 
+    const currentWeight = baselineActivities.reduce(
+      (sum, activity) => sum + toNumber(activity.weight_percent),
+      0
+    );
+    const remainingWeight = Math.max(0, Number((100 - currentWeight).toFixed(2)));
+    const defaultWeight = remainingWeight > 0 ? Math.min(remainingWeight, 1) : 0;
+
+    const today = new Date();
+    const nextWeek = new Date(today);
+    nextWeek.setDate(today.getDate() + 7);
+
+    const plannedStart = today.toISOString().slice(0, 10);
+    const plannedFinish = nextWeek.toISOString().slice(0, 10);
+
     const { error } = await supabase.from("wbs_activities").insert({
       project_id: projectId,
       parent_id: null,
@@ -212,10 +226,10 @@ export default function ConstructionWorkspace() {
       name: "Nuova attività",
       discipline: newActivityCategory,
       unit: "unit",
-      baseline_quantity: 0,
-      weight_percent: 0,
-      planned_start: null,
-      planned_finish: null,
+      baseline_quantity: 1,
+      weight_percent: defaultWeight,
+      planned_start: plannedStart,
+      planned_finish: plannedFinish,
       sort_order: maxSort + 1,
       status: "not_started",
       is_group: false,
