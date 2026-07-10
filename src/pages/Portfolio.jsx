@@ -23,6 +23,15 @@ const EMPTY_FORM = {
   priority: "MEDIUM",
 };
 
+function formatNumber(value, digits = 1) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed.toFixed(digits) : "0.0";
+}
+
+function formatMw(value) {
+  return `${formatNumber(value, 2)} MW`;
+}
+
 function KpiCard({ label, value, helper }) {
   return (
     <article className="kpi-card">
@@ -33,7 +42,16 @@ function KpiCard({ label, value, helper }) {
   );
 }
 
+function RiskBadge({ risk }) {
+  return <span className={`risk-badge risk-${risk || "NO_DATA"}`}>{risk || "NO_DATA"}</span>;
+}
+
 function ProjectCard({ project, onOpen, onEdit, onDelete }) {
+  const executive = project.executive || {};
+  const progress = Number(executive.progress || 0);
+  const planned = Number(executive.planned || 0);
+  const delay = Number(executive.delay || 0);
+
   return (
     <article
       className="project-card project-card-clickable"
@@ -49,42 +67,60 @@ function ProjectCard({ project, onOpen, onEdit, onDelete }) {
           <span>{project.code}</span>
           <h3>{project.name}</h3>
         </div>
-        <strong>{Number(project.totalPowerMwDc ?? 0).toFixed(2)} MWdc</strong>
+        <strong>{formatMw(project.totalPowerMwDc)}dc</strong>
       </div>
 
       <p className="project-location">
-        {project.municipality || "—"} · {project.province || "—"} ·{" "}
-        {project.region || "—"}
+        {project.municipality || "—"} · {project.province || "—"} · {project.region || "—"}
       </p>
 
-      <div className="project-data-grid">
+      <div className="executive-progress">
+        <div className="progress-head">
+          <span>Actual Progress</span>
+          <strong>{formatNumber(progress)}%</strong>
+        </div>
+        <div className="progress-track">
+          <div style={{ width: `${Math.min(Math.max(progress, 0), 100)}%` }} />
+        </div>
+        <small>Planned {formatNumber(planned)}%</small>
+      </div>
+
+      <div className="project-executive-grid">
         <div>
-          <span>PV DC</span>
-          <strong>{Number(project.pvPowerMwDc ?? 0).toFixed(2)} MW</strong>
+          <span>Health</span>
+          <strong>{Math.round(Number(executive.health || 0))}</strong>
         </div>
         <div>
-          <span>PV AC</span>
-          <strong>{Number(project.pvPowerMwAc ?? 0).toFixed(2)} MW</strong>
+          <span>Variance</span>
+          <strong>{formatNumber(delay)}%</strong>
         </div>
         <div>
-          <span>Partner</span>
-          <strong>{project.developmentPartner || "—"}</strong>
+          <span>Critical</span>
+          <strong>{executive.critical ?? 0}</strong>
         </div>
         <div>
-          <span>Contract</span>
-          <strong>{project.developmentContract || "—"}</strong>
+          <span>Weekly</span>
+          <strong>{executive.weeklyReports ?? 0}</strong>
         </div>
       </div>
 
       <div className="project-card-footer">
-        <span className={`status-pill ${project.status || "UNKNOWN"}`}>
-          {project.status || "UNKNOWN"}
-        </span>
-        <span className={`priority-pill ${project.priority || "MEDIUM"}`}>
-          {project.priority || "MEDIUM"}
+        <RiskBadge risk={executive.risk} />
+
+        <span className={executive.hasWeekly ? "weekly-pill ok" : "weekly-pill missing"}>
+          {executive.hasWeekly ? "Weekly active" : "No weekly"}
         </span>
 
         <div className="project-actions">
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onOpen(project.id);
+            }}
+          >
+            Open
+          </button>
           <button
             type="button"
             onClick={(event) => {
@@ -105,6 +141,13 @@ function ProjectCard({ project, onOpen, onEdit, onDelete }) {
           </button>
         </div>
       </div>
+
+      {executive.decision ? (
+        <div className="project-decision">
+          <span>{executive.decision.type || "ACTION"}</span>
+          <p>{executive.decision.title || executive.decision.message}</p>
+        </div>
+      ) : null}
     </article>
   );
 }
@@ -145,6 +188,7 @@ export default function Portfolio() {
 
     return portfolio.projects
       .filter((project) => {
+        const executive = project.executive || {};
         const searchText = [
           project.code,
           project.name,
@@ -155,6 +199,7 @@ export default function Portfolio() {
           project.developmentContract,
           project.status,
           project.priority,
+          executive.risk,
         ]
           .filter(Boolean)
           .join(" ")
@@ -163,11 +208,16 @@ export default function Portfolio() {
         return (
           searchText.includes(filters.search.trim().toLowerCase()) &&
           (filters.region === "all" || project.region === filters.region) &&
-          (filters.partner === "all" ||
-            project.developmentPartner === filters.partner)
+          (filters.partner === "all" || project.developmentPartner === filters.partner)
         );
       })
-      .sort((a, b) => a.code.localeCompare(b.code));
+      .sort((a, b) => {
+        const riskOrder = { HIGH: 0, MEDIUM: 1, LOW: 2, NO_DATA: 3 };
+        const aRisk = riskOrder[a.executive?.risk] ?? 3;
+        const bRisk = riskOrder[b.executive?.risk] ?? 3;
+        if (aRisk !== bRisk) return aRisk - bRisk;
+        return a.code.localeCompare(b.code);
+      });
   }, [portfolio, filters]);
 
   function openProjectWorkspace(projectId) {
@@ -229,9 +279,7 @@ export default function Portfolio() {
   }
 
   async function handleDelete(projectId) {
-    const confirmed = window.confirm(
-      "Confermi l'eliminazione del progetto dal Portfolio?"
-    );
+    const confirmed = window.confirm("Confermi l'eliminazione del progetto dal Portfolio?");
 
     if (!confirmed) return;
 
@@ -251,7 +299,7 @@ export default function Portfolio() {
         <section className="portfolio-hero">
           <div>
             <span className="eyebrow">HELIOS CM Enterprise</span>
-            <h1>Portfolio Progetti</h1>
+            <h1>Executive Portfolio</h1>
             <p>Errore Supabase: {error}</p>
           </div>
         </section>
@@ -265,8 +313,8 @@ export default function Portfolio() {
         <section className="portfolio-hero">
           <div>
             <span className="eyebrow">HELIOS CM Enterprise</span>
-            <h1>Portfolio Progetti</h1>
-            <p>Loading HELIOS...</p>
+            <h1>Executive Portfolio</h1>
+            <p>Loading construction snapshots...</p>
           </div>
         </section>
       </main>
@@ -278,10 +326,10 @@ export default function Portfolio() {
       <section className="portfolio-hero">
         <div>
           <span className="eyebrow">HELIOS CM Enterprise</span>
-          <h1>Portfolio Progetti</h1>
+          <h1>Executive Portfolio</h1>
           <p>
-            Registro operativo reale collegato a Supabase: progetti, potenza,
-            localizzazione, partner e contratti.
+            Overview management alimentata da WBS baseline, Weekly actual production e
+            Construction Engine.
           </p>
         </div>
 
@@ -322,11 +370,7 @@ export default function Portfolio() {
 
             <label>
               Municipality
-              <input
-                name="municipality"
-                value={form.municipality}
-                onChange={updateForm}
-              />
+              <input name="municipality" value={form.municipality} onChange={updateForm} />
             </label>
 
             <label>
@@ -412,11 +456,7 @@ export default function Portfolio() {
 
             <div className="form-actions">
               <button className="new-project-button" type="submit" disabled={isSaving}>
-                {isSaving
-                  ? "Saving..."
-                  : isEditing
-                    ? "Update Project"
-                    : "Create Project"}
+                {isSaving ? "Saving..." : isEditing ? "Update Project" : "Create Project"}
               </button>
               <button className="secondary-button" type="button" onClick={closeForm}>
                 Cancel
@@ -426,12 +466,15 @@ export default function Portfolio() {
         </section>
       ) : null}
 
-      <section className="kpi-grid">
-        <KpiCard label="Projects" value={portfolio.kpis.totalProjects} helper="Supabase records" />
-        <KpiCard label="Total MW DC" value={Number(portfolio.kpis.totalMwDc ?? 0).toFixed(2)} helper="Portfolio power" />
-        <KpiCard label="Total MW AC" value={Number(portfolio.kpis.totalMwAc ?? 0).toFixed(2)} helper="Grid power" />
-        <KpiCard label="Regions" value={portfolio.kpis.regions} helper="Italian regions" />
-        <KpiCard label="Partners" value={portfolio.kpis.partners} helper="Development partners" />
+      <section className="kpi-grid executive-kpi-grid">
+        <KpiCard label="Projects" value={portfolio.kpis.totalProjects} helper="Active portfolio" />
+        <KpiCard label="Total MW DC" value={formatNumber(portfolio.kpis.totalMwDc, 2)} helper="Portfolio power" />
+        <KpiCard label="Avg Progress" value={`${formatNumber(portfolio.kpis.avgProgress)}%`} helper="Engine actual" />
+        <KpiCard label="Avg Health" value={portfolio.kpis.avgHealth} helper="Construction health" />
+        <KpiCard label="At Risk" value={portfolio.kpis.projectsAtRisk} helper="High risk projects" />
+        <KpiCard label="Delayed" value={portfolio.kpis.delayedProjects} helper="Negative variance" />
+        <KpiCard label="No Weekly" value={portfolio.kpis.noWeekly} helper="Missing actuals" />
+        <KpiCard label="Engine Ready" value={portfolio.kpis.engineReady} helper="Snapshots loaded" />
       </section>
 
       <section className="filters-bar">
@@ -439,30 +482,38 @@ export default function Portfolio() {
           name="search"
           value={filters.search}
           onChange={updateFilter}
-          placeholder="Search project, code, municipality, province..."
+          placeholder="Search project, code, municipality, risk..."
         />
 
         <select name="region" value={filters.region} onChange={updateFilter}>
           <option value="all">All regions</option>
           {portfolio.filters.regions.map((region) => (
-            <option key={region} value={region}>{region}</option>
+            <option key={region} value={region}>
+              {region}
+            </option>
           ))}
         </select>
 
         <select name="partner" value={filters.partner} onChange={updateFilter}>
           <option value="all">All partners</option>
           {portfolio.filters.partners.map((partner) => (
-            <option key={partner} value={partner}>{partner}</option>
+            <option key={partner} value={partner}>
+              {partner}
+            </option>
           ))}
         </select>
       </section>
 
       <section className="section-heading">
-        <h2>Projects</h2>
-        <p>{filteredProjects.length} projects shown on {portfolio.projects.length} total</p>
+        <div>
+          <h2>Executive Project Cards</h2>
+          <p>
+            {filteredProjects.length} projects shown on {portfolio.projects.length} total.
+          </p>
+        </div>
       </section>
 
-      <section className="projects-grid">
+      <section className="projects-grid executive-projects-grid">
         {filteredProjects.map((project) => (
           <ProjectCard
             key={project.id}
