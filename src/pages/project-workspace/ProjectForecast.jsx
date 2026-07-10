@@ -54,6 +54,48 @@ function buildActualQtyMap(entries) {
   }, {});
 }
 
+function buildRecentWeeklyQtyMap(reports, entries, weeksCount = 4) {
+  const recentReports = [...reports]
+    .filter(isActualReport)
+    .sort((a, b) => String(b.week_start || "").localeCompare(String(a.week_start || "")))
+    .slice(0, weeksCount);
+
+  const reportIds = new Set(recentReports.map((report) => report.id));
+  const divisor = Math.max(recentReports.length, 1);
+
+  return entries
+    .filter((entry) => reportIds.has(entry.weekly_report_id))
+    .reduce((acc, entry) => {
+      const activityId = getEntryActivityId(entry);
+      if (!activityId) return acc;
+
+      acc[activityId] = toNumber(acc[activityId]) + getEntryQty(entry) / divisor;
+      return acc;
+    }, {});
+}
+
+function productivityRisk(requiredWeekly, currentWeekly) {
+  const required = toNumber(requiredWeekly);
+  const current = toNumber(currentWeekly);
+
+  if (required <= 0) return "OK";
+  if (current >= required) return "OK";
+
+  const gap = ((required - current) / required) * 100;
+
+  if (gap <= 10) return "LOW";
+  if (gap <= 25) return "MEDIUM";
+  return "HIGH";
+}
+
+function productivityGap(requiredWeekly, currentWeekly) {
+  const required = toNumber(requiredWeekly);
+  const current = toNumber(currentWeekly);
+
+  if (required <= 0) return 0;
+  return Number((((required - current) / required) * 100).toFixed(1));
+}
+
 function daysBetween(start, finish) {
   if (!start || !finish) return 0;
   const a = new Date(`${start}T12:00:00`);
@@ -67,7 +109,7 @@ function remainingDays(forecastFinish) {
   return Math.max(0, daysBetween(iso(new Date()), forecastFinish));
 }
 
-function mergeRows(activities, forecasts, actualQtyMap) {
+function mergeRows(activities, forecasts, actualQtyMap, weeklyProductivityMap = {}) {
   const forecastByActivity = new Map(forecasts.map((item) => [item.activityId, item]));
 
   return activities.map((activity) => {
@@ -75,6 +117,7 @@ function mergeRows(activities, forecasts, actualQtyMap) {
     const baselineQuantity = toNumber(activity.baseline_quantity);
     const actualQuantity = toNumber(actualQtyMap[activity.id]);
     const remainingQuantity = Math.max(0, baselineQuantity - actualQuantity);
+    const currentWeeklyProductivity = Number(toNumber(weeklyProductivityMap[activity.id]).toFixed(2));
 
     return {
       activityId: activity.id,
@@ -85,6 +128,7 @@ function mergeRows(activities, forecasts, actualQtyMap) {
       baselineQuantity,
       actualQuantity,
       remainingQuantity,
+      currentWeeklyProductivity,
       weightPercent: toNumber(activity.weight_percent),
       plannedStart: iso(activity.planned_start),
       plannedFinish: iso(activity.planned_finish),
@@ -134,6 +178,12 @@ export default function ProjectForecast() {
       .sort()
       .at(-1);
 
+    const highRiskActivities = rows.filter((row) => {
+      const weeks = row.forecastFinish ? Math.max(1, Math.ceil(remainingDays(row.forecastFinish) / 7)) : 0;
+      const required = weeks > 0 ? row.remainingQuantity / weeks : 0;
+      return productivityRisk(required, row.currentWeeklyProductivity) === "HIGH";
+    }).length;
+
     return {
       totalActivities,
       forecasted,
@@ -144,6 +194,7 @@ export default function ProjectForecast() {
       totalRemainingQty: Number(totalRemainingQty.toFixed(2)),
       baselineFinish: baselineFinish || "—",
       forecastFinish: forecastFinish || "—",
+      highRiskActivities,
     };
   }, [rows]);
 
@@ -200,11 +251,12 @@ export default function ProjectForecast() {
       }
 
       const actualQtyMap = buildActualQtyMap(weeklyEntries);
+      const weeklyProductivityMap = buildRecentWeeklyQtyMap(weeklyReports || [], weeklyEntries, 4);
 
       setRevisions(nextRevisions);
       setSelectedRevisionId(nextSelectedRevision.id);
       setSelectedRevision(nextSelectedRevision);
-      setRows(mergeRows(activities || [], forecastItems, actualQtyMap));
+      setRows(mergeRows(activities || [], forecastItems, actualQtyMap, weeklyProductivityMap));
       setDirtyIds(new Set());
     } catch (err) {
       window.alert(err.message || "Errore caricamento Recovery Forecast");
@@ -440,9 +492,19 @@ export default function ProjectForecast() {
           <small>Actual at issue date</small>
         </article>
         <article>
+          <span>Recovery Risk</span>
+          <strong>{metrics.highRiskActivities}</strong>
+          <small>High risk activities</small>
+        </article>
+        <article>
           <span>Snapshot</span>
           <strong>{selectedRevision?.actualProgressSnapshot ?? 0}%</strong>
           <small>Actual at issue date</small>
+        </article>
+        <article>
+          <span>Recovery Risk</span>
+          <strong>{metrics.highRiskActivities}</strong>
+          <small>High risk activities</small>
         </article>
       </section>
 
@@ -461,7 +523,11 @@ export default function ProjectForecast() {
               <th>Baseline Finish</th>
               <th>Forecast Start</th>
               <th>Forecast Finish</th>
-              <th>Remaining Days</th>
+              <th>Remaining Weeks</th>
+              <th>Req./Week</th>
+              <th>Current/Week</th>
+              <th>Gap</th>
+              <th>Risk</th>
               <th>Delta</th>
               <th>Note</th>
               <th></th>
@@ -472,6 +538,11 @@ export default function ProjectForecast() {
             {rows.map((row) => {
               const delta = daysBetween(row.plannedFinish, row.forecastFinish);
               const days = remainingDays(row.forecastFinish);
+              const weeks = row.forecastFinish ? Math.max(1, Math.ceil(days / 7)) : 0;
+              const requiredWeekly = weeks > 0 ? Number((row.remainingQuantity / weeks).toFixed(2)) : 0;
+              const currentWeekly = Number(toNumber(row.currentWeeklyProductivity).toFixed(2));
+              const gap = productivityGap(requiredWeekly, currentWeekly);
+              const risk = productivityRisk(requiredWeekly, currentWeekly);
 
               return (
                 <tr key={row.activityId} className={dirtyIds.has(row.activityId) ? "forecast-dirty" : ""}>
@@ -500,7 +571,13 @@ export default function ProjectForecast() {
                       onChange={(event) => updateRow(row.activityId, "forecastFinish", event.target.value)}
                     />
                   </td>
-                  <td>{row.forecastFinish ? `${days}d` : "—"}</td>
+                  <td>{row.forecastFinish ? `${weeks}w` : "—"}</td>
+                  <td>{row.forecastFinish ? requiredWeekly : "—"}</td>
+                  <td>{currentWeekly}</td>
+                  <td className={gap > 25 ? "delta-delay" : gap > 10 ? "delta-warning" : "delta-recovery"}>
+                    {row.forecastFinish ? `${gap > 0 ? "+" : ""}${gap}%` : "—"}
+                  </td>
+                  <td className={`recovery-risk-${risk}`}>{risk}</td>
                   <td className={delta > 0 ? "delta-delay" : delta < 0 ? "delta-recovery" : ""}>
                     {row.forecastFinish ? `${delta > 0 ? "+" : ""}${delta}d` : "—"}
                   </td>

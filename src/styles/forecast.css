@@ -188,3 +188,24 @@
   outline: none;
   font: inherit;
 }
+
+.delta-warning {
+  color: #fde68a;
+  font-weight: 900;
+}
+
+.recovery-risk-OK,
+.recovery-risk-LOW {
+  color: #86efac;
+  font-weight: 900;
+}
+
+.recovery-risk-MEDIUM {
+  color: #fde68a;
+  font-weight: 900;
+}
+
+.recovery-risk-HIGH {
+  color: #fecaca;
+  font-weight: 900;
+}
