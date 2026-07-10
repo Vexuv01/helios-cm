@@ -239,6 +239,71 @@ export default function ProjectForecast() {
     setDirtyIds((current) => new Set([...current, activityId]));
   }
 
+  function buildRevisionSnapshot() {
+    const totalWeight = rows.reduce((sum, row) => sum + toNumber(row.weightPercent), 0);
+
+    const actualWeighted = rows.reduce((sum, row) => {
+      const baseline = toNumber(row.baselineQuantity);
+      const actual = toNumber(row.actualQuantity);
+      const weight = toNumber(row.weightPercent);
+      const progress = baseline > 0 ? Math.min((actual / baseline) * 100, 100) : 0;
+      return sum + (progress / 100) * weight;
+    }, 0);
+
+    const today = new Date();
+
+    const plannedWeighted = rows.reduce((sum, row) => {
+      const start = row.plannedStart ? new Date(`${row.plannedStart}T12:00:00`) : null;
+      const finish = row.plannedFinish ? new Date(`${row.plannedFinish}T12:00:00`) : null;
+      const weight = toNumber(row.weightPercent);
+
+      if (!start || !finish || Number.isNaN(start.getTime()) || Number.isNaN(finish.getTime())) {
+        return sum;
+      }
+
+      let progress = 0;
+
+      if (today >= finish) {
+        progress = 100;
+      } else if (today > start) {
+        const totalMs = finish.getTime() - start.getTime();
+        const elapsedMs = today.getTime() - start.getTime();
+        progress = totalMs > 0 ? Math.min(Math.max((elapsedMs / totalMs) * 100, 0), 100) : 100;
+      }
+
+      return sum + (progress / 100) * weight;
+    }, 0);
+
+    const actualProgressSnapshot =
+      totalWeight > 0 ? Number(((actualWeighted / totalWeight) * 100).toFixed(1)) : 0;
+
+    const plannedProgressSnapshot =
+      totalWeight > 0 ? Number(((plannedWeighted / totalWeight) * 100).toFixed(1)) : 0;
+
+    const actualQtySnapshot = Number(
+      rows.reduce((sum, row) => sum + toNumber(row.actualQuantity), 0).toFixed(2)
+    );
+
+    const remainingQtySnapshot = Number(
+      rows.reduce((sum, row) => sum + toNumber(row.remainingQuantity), 0).toFixed(2)
+    );
+
+    const forecastFinishSnapshot =
+      rows
+        .map((row) => row.forecastFinish || row.plannedFinish)
+        .filter(Boolean)
+        .sort()
+        .at(-1) || "";
+
+    return {
+      actualProgressSnapshot,
+      plannedProgressSnapshot,
+      actualQtySnapshot,
+      remainingQtySnapshot,
+      forecastFinishSnapshot,
+    };
+  }
+
   async function handleSave() {
     const dirtyRows = rows.filter((row) => dirtyIds.has(row.activityId));
 
@@ -247,8 +312,13 @@ export default function ProjectForecast() {
     setSaving(true);
 
     try {
-      await updateRecoveryRevision(selectedRevision);
-      await saveRecoveryItems(selectedRevision, dirtyRows);
+      const revisionWithSnapshot = {
+        ...selectedRevision,
+        ...buildRevisionSnapshot(),
+      };
+
+      await updateRecoveryRevision(revisionWithSnapshot);
+      await saveRecoveryItems(revisionWithSnapshot, dirtyRows);
       await loadPage();
     } catch (err) {
       window.alert(err.message || "Errore salvataggio Recovery Forecast");
@@ -363,6 +433,16 @@ export default function ProjectForecast() {
           <span>Forecast Finish</span>
           <strong>{metrics.forecastFinish}</strong>
           <small>Baseline finish {metrics.baselineFinish}</small>
+        </article>
+        <article>
+          <span>Snapshot</span>
+          <strong>{selectedRevision?.actualProgressSnapshot ?? 0}%</strong>
+          <small>Actual at issue date</small>
+        </article>
+        <article>
+          <span>Snapshot</span>
+          <strong>{selectedRevision?.actualProgressSnapshot ?? 0}%</strong>
+          <small>Actual at issue date</small>
         </article>
       </section>
 
