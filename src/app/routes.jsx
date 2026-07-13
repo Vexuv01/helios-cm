@@ -85,6 +85,7 @@ export default function AppRoutes() {
           <Route path="wbs" element={<ConstructionWorkspace />} />
           <Route path="weekly" element={<ProjectWeekly />} />
           <Route path="forecast" element={<ProjectForecast />} />
+          <Route path="executive-notes" element={<ProjectExecutiveNotes />} />
           <Route path="documents" element={<ProjectDocuments />} />
           <Route path="issues" element={<ProjectIssues />} />
           <Route path="commissioning" element={<ProjectCommissioning />} />
