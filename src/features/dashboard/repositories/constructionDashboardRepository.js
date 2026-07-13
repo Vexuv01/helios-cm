@@ -124,3 +124,17 @@ export async function getConstructionRecoveryForecast(projectId) {
       ) || [],
   };
 }
+
+export async function listConstructionProjects() {
+  const result = await supabase
+    .from("projects")
+    .select("*")
+    .order("code", { ascending: true });
+
+  return (
+    assertResult(
+      result,
+      "Unable to load construction projects"
+    ) || []
+  );
+}

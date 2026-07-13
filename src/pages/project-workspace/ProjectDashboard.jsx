@@ -1,5 +1,3 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
 import {
   Area,
   AreaChart,
@@ -12,10 +10,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import {
-} from "../../features/forecast/services/recoveryForecastService";
-import { supabase } from "../../lib/supabaseClient";
-import { loadRealConstructionDashboard } from "../../services/constructionEngine.service";
+import { useProjectDashboard } from "../../features/dashboard/hooks/useProjectDashboard";
 import "../../styles/dashboard.css";
 
 const COLORS = ["#38bdf8", "#22c55e", "#f59e0b", "#ef4444", "#8b5cf6", "#14b8a6"];
@@ -61,71 +56,15 @@ function ChartTooltip() {
 }
 
 export default function ProjectDashboard() {
-  const params = useParams();
-  const navigate = useNavigate();
-  const initialProjectId = params.projectId || params.id || "";
-
-  const [projects, setProjects] = useState([]);
-  const [projectId, setProjectId] = useState(initialProjectId);
-  const [dashboard, setDashboard] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  const selectedProject = useMemo(
-    () => projects.find((project) => project.id === projectId),
-    [projects, projectId]
-  );
-
-  const loadProjects = useCallback(async () => {
-    const { data, error } = await supabase
-      .from("projects")
-      .select("*")
-      .order("code", { ascending: true });
-
-    if (error) throw new Error(error.message);
-
-    const rows = data || [];
-    setProjects(rows);
-
-    if (!projectId && rows[0]?.id) {
-      setProjectId(rows[0].id);
-    }
-  }, [projectId]);
-
-  const loadDashboard = useCallback(async (targetProjectId) => {
-    if (!targetProjectId) return;
-
-    setLoading(true);
-
-    try {
-      const result = await loadRealConstructionDashboard(targetProjectId);
-      setDashboard(result);
-    } catch (error) {
-      console.error(error);
-      setDashboard(null);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadProjects().catch((error) => {
-      console.error(error);
-      setLoading(false);
-    });
-  }, [loadProjects]);
-
-  useEffect(() => {
-    if (projectId) {
-      loadDashboard(projectId);
-    }
-  }, [loadDashboard, projectId]);
-
-
-  function handleProjectChange(event) {
-    const nextProjectId = event.target.value;
-    setProjectId(nextProjectId);
-    navigate(`/projects/${nextProjectId}/dashboard`);
-  }
+  const {
+    projects,
+    projectId,
+    dashboard,
+    selectedProject,
+    loading,
+    refreshDashboard,
+    handleProjectChange,
+  } = useProjectDashboard();
 
   if (loading) {
     return (
@@ -161,7 +100,7 @@ export default function ProjectDashboard() {
             type="button"
             aria-label="Refresh dashboard"
             title="Refresh dashboard"
-            onClick={() => loadDashboard(projectId)}
+            onClick={() => refreshDashboard(projectId)}
           >
             ↻
           </button>
