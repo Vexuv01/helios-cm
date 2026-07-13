@@ -319,25 +319,38 @@ export default function ProjectDashboard() {
 
             <div className="dashboard-card">
               <CardHead eyebrow="Weight" title="Distribution" />
-              <div className="chart-box">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={dashboard.weightDistribution}
-                      dataKey="value"
-                      nameKey="discipline"
-                      innerRadius={54}
-                      outerRadius={82}
-                      paddingAngle={4}
-                      label={({ discipline, value }) => `${discipline}: ${Number(value).toFixed(1)}%`}
-                      labelLine
-                    >
-                      {dashboard.weightDistribution.map((entry, index) => (
-                        <Cell key={entry.discipline} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                  </PieChart>
-                </ResponsiveContainer>
+              <div className="weight-distribution-layout">
+                <div className="chart-box weight-donut-box">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={dashboard.weightDistribution}
+                        dataKey="value"
+                        nameKey="discipline"
+                        innerRadius={58}
+                        outerRadius={92}
+                        paddingAngle={4}
+                      >
+                        {dashboard.weightDistribution.map((entry, index) => (
+                          <Cell key={entry.discipline} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+
+                <div className="weight-legend">
+                  {dashboard.weightDistribution.map((entry, index) => (
+                    <div className="weight-legend-row" key={entry.discipline}>
+                      <span
+                        className="weight-legend-dot"
+                        style={{ background: COLORS[index % COLORS.length] }}
+                      />
+                      <span className="weight-legend-name">{entry.discipline}</span>
+                      <strong>{Number(entry.value).toFixed(1)}%</strong>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </section>
