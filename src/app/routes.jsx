@@ -19,6 +19,9 @@ const ProjectWeekly = lazy(() =>
 const ProjectForecast = lazy(() =>
   import("../pages/project-workspace/ProjectForecast")
 );
+const ProjectExecutiveNotes = lazy(() =>
+  import("../pages/project-workspace/ProjectExecutiveNotes")
+);
 const ProjectDocuments = lazy(() =>
   import("../pages/project-workspace/ProjectDocuments")
 );
