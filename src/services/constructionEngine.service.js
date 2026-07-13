@@ -1,5 +1,11 @@
 import { runConstructionEngine } from "../domain/construction-engine";
-import { supabase } from "../lib/supabaseClient";
+import {
+  getConstructionProject,
+  getConstructionRecoveryForecast,
+  listConstructionWbsActivities,
+  listConstructionWeeklyEntries,
+  listConstructionWeeklyReports,
+} from "../features/dashboard/repositories/constructionDashboardRepository";
 
 const ACTUAL_WEEKLY_STATUSES = new Set(["SUBMITTED", "VALIDATED", "APPROVED", "LOCKED"]);
 
@@ -90,78 +96,24 @@ function normalizeProject(row) {
 }
 
 async function loadProject(projectId) {
-  const { data, error } = await supabase.from("projects").select("*").eq("id", projectId).single();
-
-  if (error) throw new Error(error.message);
-  return normalizeProject(data);
+  const row = await getConstructionProject(projectId);
+  return normalizeProject(row);
 }
 
 async function loadWbsActivities(projectId) {
-  const { data, error } = await supabase
-    .from("wbs_activities")
-    .select("*")
-    .eq("project_id", projectId)
-    .order("sort_order", { ascending: true })
-    .order("code", { ascending: true });
-
-  if (error) throw new Error(error.message);
-  return data || [];
+  return listConstructionWbsActivities(projectId);
 }
 
 async function loadWeeklyReports(projectId) {
-  const { data, error } = await supabase
-    .from("weekly_reports")
-    .select("*")
-    .eq("project_id", projectId)
-    .order("week_start", { ascending: true });
-
-  if (error) throw new Error(error.message);
-  return data || [];
+  return listConstructionWeeklyReports(projectId);
 }
 
 async function loadWeeklyEntries(reportIds) {
-  if (!reportIds.length) return [];
-
-  const { data, error } = await supabase
-    .from("weekly_entries")
-    .select("*")
-    .in("weekly_report_id", reportIds);
-
-  if (error) throw new Error(error.message);
-  return data || [];
+  return listConstructionWeeklyEntries(reportIds);
 }
 
 async function loadRecoveryForecasts(projectId) {
-  const { data: revisions, error: revisionsError } = await supabase
-    .from("recovery_plan_revisions")
-    .select("*")
-    .eq("project_id", projectId)
-    .order("revision_number", { ascending: false });
-
-  if (revisionsError) throw new Error(revisionsError.message);
-
-  const activeRevision =
-    revisions?.find((revision) => revision.status === "ACTIVE") ||
-    revisions?.[0];
-
-  if (!activeRevision) {
-    return {
-      revision: null,
-      items: [],
-    };
-  }
-
-  const { data, error } = await supabase
-    .from("recovery_plan_items")
-    .select("*")
-    .eq("revision_id", activeRevision.id);
-
-  if (error) throw new Error(error.message);
-
-  return {
-    revision: activeRevision,
-    items: data || [],
-  };
+  return getConstructionRecoveryForecast(projectId);
 }
 
 function buildInstalledMap(entries) {
