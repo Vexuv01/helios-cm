@@ -1,4 +1,12 @@
-import * as XLSX from "xlsx";
+let xlsxPromise;
+
+async function loadXlsx() {
+  if (!xlsxPromise) {
+    xlsxPromise = import("xlsx");
+  }
+
+  return xlsxPromise;
+}
 
 const SHEET_NAME = "Recovery Forecast";
 
@@ -22,7 +30,7 @@ function safeFilePart(value) {
     .replace(/^_|_$/g, "");
 }
 
-function excelDateToIso(value) {
+function excelDateToIso(value, XLSX) {
   if (!value) return "";
 
   if (value instanceof Date && !Number.isNaN(value.getTime())) {
@@ -74,11 +82,12 @@ function validateDateRange(code, start, finish) {
   }
 }
 
-export function exportRecoveryExcel({
+export async function exportRecoveryExcel({
   projectId,
   revision,
   rows,
 }) {
+  const XLSX = await loadXlsx();
   const data = rows.map((row) => ({
     Code: row.code,
     Activity: row.name,
@@ -148,6 +157,7 @@ export function exportRecoveryExcel({
 export async function importRecoveryExcel(file, rows) {
   if (!file) throw new Error("Seleziona un file Excel.");
 
+  const XLSX = await loadXlsx();
   const buffer = await file.arrayBuffer();
 
   const workbook = XLSX.read(buffer, {

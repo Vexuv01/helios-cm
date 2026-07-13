@@ -447,12 +447,18 @@ export default function ProjectForecast() {
     }
   }
 
-  function handleExportRecoveryExcel() {
-    exportRecoveryExcel({
-      projectId,
-      revision: selectedRevision,
-      rows,
-    });
+  async function handleExportRecoveryExcel() {
+    try {
+      await exportRecoveryExcel({
+        projectId,
+        revision: selectedRevision,
+        rows,
+      });
+    } catch (error) {
+      window.alert(
+        error.message || "Errore durante l'export Recovery Excel."
+      );
+    }
   }
 
   async function handleImportRecoveryExcel(event) {
