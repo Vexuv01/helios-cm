@@ -1,5 +1,9 @@
 import { runConstructionEngine } from "../domain/construction-engine";
 import {
+  mapConstructionActivity,
+  mapConstructionProject,
+} from "../features/dashboard/domain/constructionDashboardMapper";
+import {
   getConstructionProject,
   getConstructionRecoveryForecast,
   listConstructionWbsActivities,
@@ -56,48 +60,9 @@ function isActualReport(report) {
   return ACTUAL_WEEKLY_STATUSES.has(String(report.status || "").toUpperCase());
 }
 
-function normalizeActivity(row, installedQuantity, forecast = null) {
-  return {
-    id: row.id,
-    projectId: row.project_id,
-    code: row.code || "",
-    name: row.name || "",
-    discipline: row.discipline || "GENERAL",
-    unit: row.unit || "nr",
-    baselineQuantity: n(row.baseline_quantity),
-    installedQuantity: n(installedQuantity),
-    weightPercent: n(row.weight_percent),
-    plannedStart: iso(row.planned_start),
-    plannedFinish: iso(row.planned_finish),
-    forecastStart: iso(forecast?.forecast_start),
-    forecastFinish: iso(forecast?.forecast_finish),
-    forecastNote: forecast?.forecast_note || "",
-    recoveryIssueDate: iso(forecast?.recovery_issue_date),
-    recoveryRevisionNumber: forecast?.recovery_revision_number || null,
-    recoveryStatus: forecast?.recovery_status || "",
-    actualStart: iso(row.actual_start),
-    actualFinish: iso(row.actual_finish),
-    status: row.status || "BASELINE",
-    sortOrder: n(row.sort_order),
-    isGroup: Boolean(row.is_group),
-  };
-}
-
-function normalizeProject(row) {
-  return {
-    id: row.id,
-    code: row.code || "",
-    name: row.name || "",
-    status: row.status || null,
-    startDate: iso(row.start_date),
-    plannedCOD: iso(row.planned_cod),
-    forecastCOD: iso(row.forecast_cod),
-  };
-}
-
 async function loadProject(projectId) {
   const row = await getConstructionProject(projectId);
-  return normalizeProject(row);
+  return mapConstructionProject(row);
 }
 
 async function loadWbsActivities(projectId) {
@@ -409,7 +374,7 @@ export async function loadRealConstructionDashboard(projectId) {
 
   const activities = rawActivities
     .filter((activity) => activity.is_group !== true)
-    .map((activity) => normalizeActivity(activity, installedMap[activity.id], forecastMap[activity.id]));
+    .map((activity) => mapConstructionActivity(activity, installedMap[activity.id], forecastMap[activity.id]));
 
   const engine = runConstructionEngine({
     project,
