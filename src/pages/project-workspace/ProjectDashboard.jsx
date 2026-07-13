@@ -7,8 +7,6 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
-  Pie,
-  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -251,14 +249,14 @@ export default function ProjectDashboard() {
             </div>
           </section>
 
-          <section className="dashboard-card">
+          <section className="dashboard-card s-curve-card">
             <CardHead
               eyebrow="S-Curve"
               title="Planned WBS vs Weekly Actual"
               action={stateLabel(dashboard.scheduleGap)}
             />
 
-            <div className="chart-box xl">
+            <div className="chart-box xl s-curve-chart">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={dashboard.curve}>
                   <CartesianGrid stroke="rgba(148,163,184,.12)" vertical={false} />
@@ -317,40 +315,25 @@ export default function ProjectDashboard() {
               </div>
             </div>
 
-            <div className="dashboard-card">
+            <div className="dashboard-card weight-summary-card">
               <CardHead eyebrow="Weight" title="Distribution" />
-              <div className="weight-distribution-layout">
-                <div className="chart-box weight-donut-box">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={dashboard.weightDistribution}
-                        dataKey="value"
-                        nameKey="discipline"
-                        innerRadius={58}
-                        outerRadius={92}
-                        paddingAngle={4}
-                      >
-                        {dashboard.weightDistribution.map((entry, index) => (
-                          <Cell key={entry.discipline} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
 
-                <div className="weight-legend">
-                  {dashboard.weightDistribution.map((entry, index) => (
-                    <div className="weight-legend-row" key={entry.discipline}>
-                      <span
-                        className="weight-legend-dot"
-                        style={{ background: COLORS[index % COLORS.length] }}
-                      />
-                      <span className="weight-legend-name">{entry.discipline}</span>
-                      <strong>{Number(entry.value).toFixed(1)}%</strong>
+              <div className="weight-list-only">
+                {dashboard.weightDistribution.map((entry, index) => (
+                  <div className="weight-summary-row" key={entry.discipline}>
+                    <span
+                      className="weight-summary-indicator"
+                      style={{ background: COLORS[index % COLORS.length] }}
+                    />
+
+                    <div className="weight-summary-copy">
+                      <strong>{entry.discipline}</strong>
+                      <span>Baseline weight allocation</span>
                     </div>
-                  ))}
-                </div>
+
+                    <b>{Number(entry.value).toFixed(1)}%</b>
+                  </div>
+                ))}
               </div>
             </div>
           </section>
