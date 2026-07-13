@@ -1,3 +1,8 @@
+import {
+  listRecoveryWbsActivities,
+  listRecoveryWeeklyEntries,
+  listRecoveryWeeklyReports,
+} from "../repositories/recoveryForecastRepository";
 import { supabase } from "../../../lib/supabaseClient";
 
 function normalizeRevision(row) {
@@ -198,4 +203,29 @@ export async function deleteRecoveryPlan(projectId) {
 
   if (error) throw new Error(error.message);
   return true;
+}
+
+export async function loadRecoveryForecastSourceData(projectId) {
+  if (!projectId) {
+    return {
+      activities: [],
+      weeklyReports: [],
+      weeklyEntries: [],
+    };
+  }
+
+  const [activities, weeklyReports] = await Promise.all([
+    listRecoveryWbsActivities(projectId),
+    listRecoveryWeeklyReports(projectId),
+  ]);
+
+  const weeklyEntries = await listRecoveryWeeklyEntries(
+    weeklyReports.map((report) => report.id)
+  );
+
+  return {
+    activities,
+    weeklyReports,
+    weeklyEntries,
+  };
 }

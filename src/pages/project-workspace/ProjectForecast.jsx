@@ -6,12 +6,12 @@ import {
   createRecoveryRevision,
   deleteRecoveryPlan,
   deleteRecoveryRevision,
+  loadRecoveryForecastSourceData,
   loadRecoveryItems,
   loadRecoveryRevisions,
   saveRecoveryItems,
   updateRecoveryRevision,
 } from "../../features/forecast/services/recoveryForecastService";
-import { supabase } from "../../lib/supabaseClient";
 import {
   exportRecoveryExcel,
   importRecoveryExcel,
@@ -222,37 +222,26 @@ export default function ProjectForecast() {
         nextRevisions[0];
 
       const [
-        { data: activities, error: activitiesError },
-        { data: weeklyReports, error: reportsError },
+        sourceData,
         forecastItems,
       ] = await Promise.all([
-        supabase
-          .from("wbs_activities")
-          .select("*")
-          .eq("project_id", projectId)
-          .eq("is_group", false)
-          .order("sort_order", { ascending: true })
-          .order("code", { ascending: true }),
-        supabase.from("weekly_reports").select("*").eq("project_id", projectId),
+        loadRecoveryForecastSourceData(projectId),
         loadRecoveryItems(nextSelectedRevision.id),
       ]);
 
-      if (activitiesError) throw new Error(activitiesError.message);
-      if (reportsError) throw new Error(reportsError.message);
+      const activities = sourceData.activities;
+      const weeklyReports = sourceData.weeklyReports;
 
-      const actualReportIds = (weeklyReports || []).filter(isActualReport).map((report) => report.id);
+      const actualReportIds = weeklyReports
+        .filter(isActualReport)
+        .map((report) => report.id);
 
-      let weeklyEntries = [];
+      const actualReportIdSet = new Set(actualReportIds);
 
-      if (actualReportIds.length) {
-        const { data: entriesData, error: entriesError } = await supabase
-          .from("weekly_entries")
-          .select("*")
-          .in("weekly_report_id", actualReportIds);
-
-        if (entriesError) throw new Error(entriesError.message);
-        weeklyEntries = entriesData || [];
-      }
+      const weeklyEntries = sourceData.weeklyEntries.filter(
+        (entry) =>
+          actualReportIdSet.has(entry.weekly_report_id)
+      );
 
       const actualQtyMap = buildActualQtyMap(weeklyEntries);
       const weeklyProductivityMap = buildRecentWeeklyQtyMap(weeklyReports || [], weeklyEntries, 4);
@@ -260,7 +249,7 @@ export default function ProjectForecast() {
       setRevisions(nextRevisions);
       setSelectedRevisionId(nextSelectedRevision.id);
       setSelectedRevision(nextSelectedRevision);
-      setRows(mergeRows(activities || [], forecastItems, actualQtyMap, weeklyProductivityMap));
+      setRows(mergeRows(activities, forecastItems, actualQtyMap, weeklyProductivityMap));
       setDirtyIds(new Set());
       setRevisionDirty(false);
     } catch (err) {
