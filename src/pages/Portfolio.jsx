@@ -5,7 +5,6 @@ import {
   removePortfolioProject,
   savePortfolioProject,
 } from "../features/portfolio/services/portfolioService";
-import { generateWeeklyManagementPpt } from "../features/reports/services/executiveReportService";
 import "../styles/portfolio.css";
 
 const EMPTY_FORM = {
@@ -328,6 +327,10 @@ export default function Portfolio() {
     setExportPptError("");
 
     try {
+      const { generateWeeklyManagementPpt } = await import(
+        "../features/reports/services/executiveReportService"
+      );
+
       await generateWeeklyManagementPpt();
     } catch (exportError) {
       console.error("Weekly PPT export failed:", exportError);
