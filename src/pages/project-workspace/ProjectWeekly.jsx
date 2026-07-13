@@ -1,10 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
-import { supabase } from "../../lib/supabaseClient";
 import {
   exportWeeklyExcel,
   importWeeklyExcel,
 } from "../../features/weekly/excel/weeklyExcelService";
+import {
+  isWeeklyProductionLocked,
+  loadProjectWeeklyProduction,
+  removeProjectWeekly,
+  saveProjectWeeklyProduction,
+  toWeeklyNumber,
+  unlockProjectWeekly,
+} from "../../features/weekly/services/projectWeeklyService";
 import "../../styles/construction-workspace.css";
 
 function iso(date) {
@@ -38,25 +45,12 @@ function shiftMonday(mondayIso, weeks) {
 }
 
 function toNumber(value) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : 0;
+  return toWeeklyNumber(value);
 }
 
 function percent(actual, baseline) {
   if (toNumber(baseline) <= 0) return 0;
   return Math.min((toNumber(actual) / toNumber(baseline)) * 100, 100);
-}
-
-function getEntryQty(entry) {
-  return toNumber(entry.actual_quantity ?? entry.installed_quantity ?? entry.produced_quantity ?? entry.quantity ?? entry.qty ?? 0);
-}
-
-function getEntryActivityId(entry) {
-  return entry.wbs_activity_id || entry.activity_id || entry.wbs_id;
-}
-
-function isActualStatus(status) {
-  return ["SUBMITTED", "VALIDATED", "APPROVED"].includes(String(status || "").toUpperCase());
 }
 
 export default function ProjectWeekly() {
@@ -80,7 +74,7 @@ export default function ProjectWeekly() {
   const [importingExcel, setImportingExcel] = useState(false);
   const weeklyExcelInputRef = useRef(null);
 
-  const locked = isActualStatus(report?.status);
+  const locked = isWeeklyProductionLocked(report?.status);
 
   const operationalActivities = useMemo(
     () => activities.filter((activity) => activity.is_group !== true),
@@ -119,113 +113,39 @@ export default function ProjectWeekly() {
   const loadWeekly = useCallback(async () => {
     setLoading(true);
 
-    const { data: projectRows } = await supabase
-      .from("projects")
-      .select("*")
-      .order("code", { ascending: true });
+    try {
+      const data = await loadProjectWeeklyProduction({
+        requestedProjectId: projectId,
+        routeProjectId,
+        weekStart: week.weekStart,
+      });
 
-    const nextProjects = projectRows || [];
-    const nextProjectId = projectId || routeProjectId || nextProjects[0]?.id || "";
+      setProjects(data.projects);
 
-    setProjects(nextProjects);
+      if (data.projectId !== projectId) {
+        setProjectId(data.projectId);
+      }
 
-    if (!projectId && nextProjectId) {
-      setProjectId(nextProjectId);
-    }
-
-    if (!nextProjectId) {
+      setReports(data.reports);
+      setReport(data.report);
+      setActivities(data.activities);
+      setWeeklyValues(data.weeklyValues);
+      setCumulativeValues(data.cumulativeValues);
+    } catch (error) {
+      window.alert(error.message || "Errore caricamento Weekly");
+      setReports([]);
+      setReport(null);
       setActivities([]);
+      setWeeklyValues({});
+      setCumulativeValues({});
+    } finally {
       setLoading(false);
-      return;
     }
-
-    const { data: wbsRows, error: wbsError } = await supabase
-      .from("wbs_activities")
-      .select("*")
-      .eq("project_id", nextProjectId)
-      .order("sort_order", { ascending: true })
-      .order("code", { ascending: true });
-
-    if (wbsError) alert(wbsError.message);
-
-    const { data: reportRows, error: reportsError } = await supabase
-      .from("weekly_reports")
-      .select("*")
-      .eq("project_id", nextProjectId)
-      .order("week_start", { ascending: true });
-
-    if (reportsError) alert(reportsError.message);
-
-    const nextReports = reportRows || [];
-    const currentReport = nextReports.find((item) => item.week_start === week.weekStart) || null;
-
-    const reportIds = nextReports.map((item) => item.id);
-    let entries = [];
-
-    if (reportIds.length > 0) {
-      const { data: entryRows, error: entriesError } = await supabase
-        .from("weekly_entries")
-        .select("*")
-        .in("weekly_report_id", reportIds);
-
-      if (entriesError) alert(entriesError.message);
-      entries = entryRows || [];
-    }
-
-    const validActivityIds = new Set((wbsRows || []).map((activity) => activity.id));
-    const validEntries = entries.filter((entry) => validActivityIds.has(getEntryActivityId(entry)));
-    const validReportIds = new Set(validEntries.map((entry) => entry.weekly_report_id));
-    const visibleReports = nextReports.filter((item) => validReportIds.has(item.id) || item.id === currentReport?.id);
-
-    const currentValues = {};
-    const cumulative = {};
-
-    validEntries.forEach((entry) => {
-      const activityId = getEntryActivityId(entry);
-      if (!activityId) return;
-
-      const relatedReport = nextReports.find((item) => item.id === entry.weekly_report_id);
-      const qty = getEntryQty(entry);
-
-      if (relatedReport?.id === currentReport?.id) {
-        currentValues[activityId] = qty;
-      }
-
-      if (relatedReport?.week_start < week.weekStart && isActualStatus(relatedReport?.status)) {
-        cumulative[activityId] = toNumber(cumulative[activityId]) + qty;
-      }
-    });
-
-    setReports(visibleReports);
-    setReport(currentReport);
-    setActivities(wbsRows || []);
-    setWeeklyValues(currentValues);
-    setCumulativeValues(cumulative);
-    setLoading(false);
   }, [projectId, routeProjectId, week.weekStart]);
 
   useEffect(() => {
     loadWeekly();
   }, [loadWeekly]);
-
-  async function ensureReport(status = "DRAFT") {
-    const { data, error } = await supabase
-      .from("weekly_reports")
-      .upsert(
-        {
-          project_id: projectId,
-          week_start: week.weekStart,
-          week_end: week.weekEnd,
-          status,
-        },
-        { onConflict: "project_id,week_start" }
-      )
-      .select("*")
-      .single();
-
-    if (error) throw new Error(error.message);
-    return data;
-  }
 
   async function saveWeekly(nextStatus = "DRAFT") {
     if (locked) {
@@ -236,24 +156,13 @@ export default function ProjectWeekly() {
     setSaving(true);
 
     try {
-      const savedReport = await ensureReport(nextStatus);
-
-      await supabase.from("weekly_entries").delete().eq("weekly_report_id", savedReport.id);
-
-      const payload = Object.entries(weeklyValues)
-        .filter(([, value]) => toNumber(value) !== 0)
-        .map(([activityId, value]) => ({
-          project_id: projectId,
-          weekly_report_id: savedReport.id,
-          activity_id: activityId,
-          wbs_activity_id: activityId,
-          actual_quantity: toNumber(value),
-        }));
-
-      if (payload.length > 0) {
-        const { error } = await supabase.from("weekly_entries").insert(payload);
-        if (error) throw new Error(error.message);
-      }
+      await saveProjectWeeklyProduction({
+        projectId,
+        weekStart: week.weekStart,
+        weekEnd: week.weekEnd,
+        status: nextStatus,
+        weeklyValues,
+      });
 
       await loadWeekly();
     } catch (error) {
@@ -274,19 +183,14 @@ export default function ProjectWeekly() {
 
     setSaving(true);
 
-    const { error } = await supabase
-      .from("weekly_reports")
-      .update({ status: "DRAFT" })
-      .eq("id", report.id);
-
-    if (error) {
+    try {
+      await unlockProjectWeekly(report.id);
+      await loadWeekly();
+    } catch (error) {
       alert(error.message);
+    } finally {
       setSaving(false);
-      return;
     }
-
-    setSaving(false);
-    await loadWeekly();
   }
 
   async function deleteCurrentWeekly() {
@@ -304,23 +208,12 @@ export default function ProjectWeekly() {
     setSaving(true);
 
     try {
-      const deleteEntries = await supabase
-        .from("weekly_entries")
-        .delete()
-        .eq("weekly_report_id", report.id);
-
-      if (deleteEntries.error) throw new Error(deleteEntries.error.message);
-
-      const deleteReport = await supabase
-        .from("weekly_reports")
-        .delete()
-        .eq("id", report.id);
-
-      if (deleteReport.error) throw new Error(deleteReport.error.message);
+      await removeProjectWeekly(report.id);
 
       setReport(null);
       setWeeklyValues({});
       setCumulativeValues({});
+
       await loadWeekly();
     } catch (error) {
       alert(error.message);
