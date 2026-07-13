@@ -239,19 +239,25 @@ export default function ProjectWeekly() {
     await saveWeekly("SUBMITTED");
   }
 
-  function handleExportWeeklyExcel() {
+  async function handleExportWeeklyExcel() {
     const selectedProject = projects.find(
       (project) => project.id === projectId
     );
 
-    exportWeeklyExcel({
-      project: selectedProject,
-      weekStart: week.weekStart,
-      weekEnd: week.weekEnd,
-      activities: operationalActivities,
-      cumulativeValues,
-      weeklyValues,
-    });
+    try {
+      await exportWeeklyExcel({
+        project: selectedProject,
+        weekStart: week.weekStart,
+        weekEnd: week.weekEnd,
+        activities: operationalActivities,
+        cumulativeValues,
+        weeklyValues,
+      });
+    } catch (error) {
+      window.alert(
+        error.message || "Errore durante l'export Weekly Excel."
+      );
+    }
   }
 
   async function handleImportWeeklyExcel(event) {

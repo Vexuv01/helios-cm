@@ -1,5 +1,3 @@
-import * as XLSX from "xlsx";
-
 const SHEET_NAME = "Weekly Production";
 
 function number(value) {
@@ -22,7 +20,7 @@ function safeFilePart(value) {
     .replace(/^_|_$/g, "");
 }
 
-export function exportWeeklyExcel({
+export async function exportWeeklyExcel({
   project,
   weekStart,
   weekEnd,
@@ -30,6 +28,7 @@ export function exportWeeklyExcel({
   cumulativeValues,
   weeklyValues,
 }) {
+  const XLSX = await import("xlsx");
   const rows = activities.map((activity) => {
     const previousCumulative = number(cumulativeValues[activity.id]);
     const thisWeek = number(weeklyValues[activity.id]);
@@ -104,6 +103,7 @@ export function exportWeeklyExcel({
 export async function importWeeklyExcel(file, activities) {
   if (!file) throw new Error("Seleziona un file Excel.");
 
+  const XLSX = await import("xlsx");
   const buffer = await file.arrayBuffer();
   const workbook = XLSX.read(buffer, {
     type: "array",
