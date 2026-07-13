@@ -120,10 +120,46 @@ function addCover(ppt, report) {
     color: "6B7280",
   });
 
-  addKpi(slide, "Projects", report.portfolio.projectsCount, 0.6, 4.25);
-  addKpi(slide, "Avg Actual", pct(report.portfolio.avgActualProgress), 3.1, 4.25);
-  addKpi(slide, "Critical", report.portfolio.criticalProjects, 5.6, 4.25, "B91C1C");
-  addKpi(slide, "Watch", report.portfolio.watchProjects, 8.1, 4.25, "A16207");
+  addKpi(slide, "Projects", report.portfolio.projectsCount, 0.6, 4.05);
+  addKpi(slide, "Avg Actual", pct(report.portfolio.avgActualProgress), 3.1, 4.05);
+  addKpi(slide, "Critical", report.portfolio.criticalProjects, 5.6, 4.05, "B91C1C");
+  addKpi(slide, "Watch", report.portfolio.watchProjects, 8.1, 4.05, "A16207");
+
+  addKpi(
+    slide,
+    "Recovery Plans",
+    report.portfolio.activeRecoveryPlans,
+    0.6,
+    5.15,
+    "C2410C"
+  );
+
+  addKpi(
+    slide,
+    "Approved Notes",
+    report.portfolio.approvedExecutiveNotes,
+    3.1,
+    5.15,
+    "15803D"
+  );
+
+  addKpi(
+    slide,
+    "Management Requests",
+    report.portfolio.managementRequests,
+    5.6,
+    5.15,
+    "6D28D9"
+  );
+
+  addKpi(
+    slide,
+    "High Risks",
+    report.portfolio.highRisks,
+    8.1,
+    5.15,
+    "B91C1C"
+  );
 
   slide.addText("Confidential", {
     x: 10.8,
@@ -310,6 +346,260 @@ function addProjectSlide(ppt, snapshot, index) {
   });
 }
 
+
+function bulletText(items, fallback = "No items reported.") {
+  if (!items?.length) return fallback;
+  return items.map((item) => `• ${item.text}`).join("\n");
+}
+
+function riskText(items) {
+  if (!items?.length) return "No risks reported.";
+
+  return items
+    .map((item) => {
+      const owner = item.owner ? ` · Owner: ${item.owner}` : "";
+      return `• [${item.level}] ${item.text}${owner}`;
+    })
+    .join("\n");
+}
+
+function addNotesPanel(slide, title, body, x, y, w, h, accent = "38BDF8") {
+  slide.addShape("roundRect", {
+    x,
+    y,
+    w,
+    h,
+    fill: { color: "F8FAFC" },
+    line: { color: "E2E8F0", pt: 0.8 },
+    radius: 0.12,
+  });
+
+  slide.addShape("rect", {
+    x,
+    y,
+    w: 0.08,
+    h,
+    fill: { color: accent },
+    line: { color: accent },
+  });
+
+  slide.addText(title, {
+    x: x + 0.18,
+    y: y + 0.12,
+    w: w - 0.3,
+    h: 0.25,
+    fontSize: 9,
+    bold: true,
+    color: "0F172A",
+  });
+
+  slide.addText(body, {
+    x: x + 0.18,
+    y: y + 0.45,
+    w: w - 0.32,
+    h: h - 0.58,
+    fontSize: 7.5,
+    color: "334155",
+    breakLine: false,
+    valign: "top",
+    fit: "shrink",
+    margin: 0.02,
+  });
+}
+
+function hasExecutiveContent(notes) {
+  return Boolean(
+    notes?.summary ||
+      notes?.achievements?.length ||
+      notes?.challenges?.length ||
+      notes?.risks?.length ||
+      notes?.managementRequests?.length ||
+      notes?.nextWeek?.length
+  );
+}
+
+function addProjectExecutiveNotesSlide(ppt, snapshot, index) {
+  const notes = snapshot.executiveNotes;
+  if (!hasExecutiveContent(notes)) return;
+
+  const slide = ppt.addSlide();
+
+  addHeader(
+    slide,
+    `${index + 1}. ${safe(snapshot.project.name)} · Executive Update`,
+    `Reporting week ${fmtDate(notes.weekStart)} — ${fmtDate(notes.weekEnd)} · Status ${notes.status}`
+  );
+
+  addNotesPanel(
+    slide,
+    "Executive Summary",
+    notes.summary || "No executive summary reported.",
+    0.55,
+    1.2,
+    12.15,
+    1.05,
+    "0EA5E9"
+  );
+
+  addNotesPanel(
+    slide,
+    "Achievements",
+    bulletText(notes.achievements, "No achievements reported."),
+    0.55,
+    2.5,
+    3.85,
+    1.65,
+    "22C55E"
+  );
+
+  addNotesPanel(
+    slide,
+    "Challenges",
+    bulletText(notes.challenges, "No challenges reported."),
+    4.65,
+    2.5,
+    3.85,
+    1.65,
+    "F59E0B"
+  );
+
+  addNotesPanel(
+    slide,
+    "Risks",
+    riskText(notes.risks),
+    8.75,
+    2.5,
+    3.95,
+    1.65,
+    "EF4444"
+  );
+
+  addNotesPanel(
+    slide,
+    "Management Requests",
+    bulletText(notes.managementRequests, "No management requests."),
+    0.55,
+    4.45,
+    5.95,
+    1.65,
+    "8B5CF6"
+  );
+
+  addNotesPanel(
+    slide,
+    "Next Week Focus",
+    bulletText(notes.nextWeek, "No next-week priorities reported."),
+    6.75,
+    4.45,
+    5.95,
+    1.65,
+    "14B8A6"
+  );
+}
+
+function addDecisionLogSlide(ppt, report) {
+  const requests = report.projects.flatMap((snapshot) =>
+    snapshot.executiveNotes.managementRequests.map((item) => ({
+      project: snapshot.project.name,
+      request: item.text,
+      status: snapshot.executiveNotes.status,
+    }))
+  );
+
+  const risks = report.projects.flatMap((snapshot) =>
+    snapshot.executiveNotes.risks
+      .filter((item) => item.level === "HIGH" || item.level === "CRITICAL")
+      .map((item) => ({
+        project: snapshot.project.name,
+        risk: item.text,
+        level: item.level,
+        owner: item.owner || "-",
+      }))
+  );
+
+  if (!requests.length && !risks.length) return;
+
+  const slide = ppt.addSlide();
+
+  addHeader(
+    slide,
+    "Management Decisions & Portfolio Risks",
+    "Consolidated from approved and ready Executive Notes"
+  );
+
+  slide.addText("Management Requests", {
+    x: 0.55,
+    y: 1.2,
+    w: 5,
+    h: 0.3,
+    fontSize: 13,
+    bold: true,
+    color: "111827",
+  });
+
+  const requestRows = [
+    [
+      { text: "Project", options: { bold: true } },
+      { text: "Decision / Support Required", options: { bold: true } },
+      { text: "Notes Status", options: { bold: true } },
+    ],
+    ...requests.slice(0, 8).map((item) => [
+      safe(item.project),
+      item.request,
+      item.status,
+    ]),
+  ];
+
+  slide.addTable(requestRows, {
+    x: 0.55,
+    y: 1.6,
+    w: 12.15,
+    h: 2.05,
+    fontSize: 7,
+    border: { color: "E2E8F0", pt: 0.5 },
+    margin: 0.04,
+    color: "1E293B",
+    fill: "FFFFFF",
+  });
+
+  slide.addText("High & Critical Risks", {
+    x: 0.55,
+    y: 4.0,
+    w: 5,
+    h: 0.3,
+    fontSize: 13,
+    bold: true,
+    color: "111827",
+  });
+
+  const riskRows = [
+    [
+      { text: "Project", options: { bold: true } },
+      { text: "Risk", options: { bold: true } },
+      { text: "Level", options: { bold: true } },
+      { text: "Owner", options: { bold: true } },
+    ],
+    ...risks.slice(0, 8).map((item) => [
+      safe(item.project),
+      item.risk,
+      item.level,
+      item.owner,
+    ]),
+  ];
+
+  slide.addTable(riskRows, {
+    x: 0.55,
+    y: 4.4,
+    w: 12.15,
+    h: 2.05,
+    fontSize: 7,
+    border: { color: "E2E8F0", pt: 0.5 },
+    margin: 0.04,
+    color: "1E293B",
+    fill: "FFFFFF",
+  });
+}
+
 export async function renderWeeklyManagementPpt(report) {
   const ppt = new pptxgen();
 
@@ -322,7 +612,13 @@ export async function renderWeeklyManagementPpt(report) {
 
   addCover(ppt, report);
   addPortfolioSlide(ppt, report);
-  report.projects.forEach((snapshot, index) => addProjectSlide(ppt, snapshot, index));
+
+  report.projects.forEach((snapshot, index) => {
+    addProjectSlide(ppt, snapshot, index);
+    addProjectExecutiveNotesSlide(ppt, snapshot, index);
+  });
+
+  addDecisionLogSlide(ppt, report);
 
   await ppt.writeFile({
     fileName: `HELIOS_Construction_Overview_${new Date(report.generatedAt).toISOString().slice(0, 10)}.pptx`,

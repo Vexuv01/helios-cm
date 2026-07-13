@@ -1,6 +1,7 @@
 import { supabase } from "../../../lib/supabaseClient";
 import { buildExecutivePortfolioReport } from "../../../domain/reporting/executiveReportEngine";
 import { renderWeeklyManagementPpt } from "../renderers/weeklyManagementPptRenderer";
+import { loadLatestExecutiveNote } from "./executiveNotesService";
 
 async function getProjects() {
   const { data, error } = await supabase
@@ -51,10 +52,11 @@ async function buildReportInput() {
 
   const enrichedProjects = await Promise.all(
     projects.map(async (project) => {
-      const [wbs, weeklyEntries, recovery] = await Promise.all([
+      const [wbs, weeklyEntries, recovery, executiveNotes] = await Promise.all([
         getWbs(project.id),
         getWeeklyEntries(project.id),
         getRecovery(project.id),
+        loadLatestExecutiveNote(project.id).catch(() => null),
       ]);
 
       return {
@@ -62,6 +64,7 @@ async function buildReportInput() {
         wbs,
         weeklyEntries,
         recovery,
+        executiveNotes,
       };
     })
   );
