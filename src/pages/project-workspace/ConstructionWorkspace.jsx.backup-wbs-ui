@@ -325,19 +325,16 @@ export default function ConstructionWorkspace() {
 
   return (
     <main className="construction-workspace">
-      <header className="cw-baseline-header">
-        <div className="cw-baseline-title">
+      <header className="cw-workspace-header">
+        <div>
           <span>PM Planning Area</span>
           <h1>Construction Baseline</h1>
-          <p>
-            Pianificazione WBS del progetto. Ogni riga rappresenta una lavorazione reale.
-          </p>
+          <p>Una riga = una lavorazione reale. Il Weight % è riferito al progetto.</p>
         </div>
 
-        <div className="cw-baseline-project">
-          <label htmlFor="wbs-project-select">Project</label>
+        <div className="cw-project-select">
+          <label>Project</label>
           <select
-            id="wbs-project-select"
             value={projectId}
             onChange={(event) => {
               const nextProjectId = event.target.value;
@@ -354,170 +351,108 @@ export default function ConstructionWorkspace() {
         </div>
       </header>
 
-      <section className="cw-baseline-summary">
-        <div className="cw-summary-project">
-          <span>Current baseline</span>
-          <strong>
-            {selectedProject
-              ? `${selectedProject.code} · ${selectedProject.name}`
-              : "No project selected"}
-          </strong>
+      <section className="cw-metrics">
+        <div>
+          <span>Project</span>
+          <strong>{selectedProject ? `${selectedProject.code} · ${selectedProject.name}` : "—"}</strong>
         </div>
-
-        <div className="cw-summary-metric">
+        <div>
           <span>Activities</span>
           <strong>{metrics.activities}</strong>
         </div>
-
-        <div className="cw-summary-metric">
+        <div>
           <span>Total Weight</span>
           <strong className={metrics.validWeight ? "weight-good" : "weight-bad"}>
             {metrics.totalWeight}%
           </strong>
         </div>
-
-        <div className="cw-summary-metric">
+        <div>
           <span>Missing Dates</span>
           <strong>{metrics.missingDates}</strong>
         </div>
-
-        <div className="cw-summary-save">
-          <div>
-            <span
-              className={
-                dirtyIds.size > 0
-                  ? "cw-save-status cw-save-status-dirty"
-                  : "cw-save-status cw-save-status-clean"
-              }
-            >
-              <i />
-              {dirtyIds.size > 0
-                ? `${dirtyIds.size} unsaved change${dirtyIds.size === 1 ? "" : "s"}`
-                : "All changes saved"}
-            </span>
-
-            <small>
-              {metrics.validWeight
-                ? "Baseline weight validated"
-                : "Total weight must equal 100%"}
-            </small>
-          </div>
-
-          <button
-            type="button"
-            className="cw-save-button"
-            onClick={saveAllChanges}
-            disabled={dirtyIds.size === 0 || saving}
-          >
-            {saving ? "Saving..." : "Save All"}
-          </button>
+        <div>
+          <span>Unsaved</span>
+          <strong>{dirtyIds.size}</strong>
         </div>
       </section>
 
-      <section className="cw-baseline-toolbar">
-        <div className="cw-toolbar-filters">
-          <label className="cw-search-field">
-            <span>Search</span>
-            <input
-              placeholder="Code, activity or discipline..."
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-            />
-          </label>
-
-          <label className="cw-category-field">
-            <span>Discipline</span>
-            <select
-              value={category}
-              onChange={(event) => setCategory(event.target.value)}
-            >
-              <option value="all">All disciplines</option>
-              {categories.map((item) => (
-                <option key={item} value={item}>
-                  {item}
-                </option>
-              ))}
-            </select>
-          </label>
+      <section className="cw-save-bar">
+        <div>
+          <strong>{dirtyIds.size} modifiche non salvate</strong>
+          <span>
+            Weight {metrics.totalWeight}% · {metrics.validWeight ? "baseline valida" : "peso da correggere"}
+          </span>
         </div>
 
-        <div className="cw-toolbar-primary">
-          <button
-            type="button"
-            className="cw-primary-action"
-            onClick={addActivity}
-          >
-            + New Activity
-          </button>
+        <button type="button" onClick={saveAllChanges} disabled={dirtyIds.size === 0 || saving}>
+          {saving ? "Saving..." : "Save all"}
+        </button>
+      </section>
 
-          <input
-            ref={excelInputRef}
-            type="file"
-            accept=".xlsx,.xls"
-            style={{ display: "none" }}
-            onChange={async (event) => {
-              const file = event.target.files?.[0];
-              event.target.value = "";
-              if (!file) return;
+      <section className="cw-toolbar baseline-toolbar">
+        <input
+          placeholder="Search baseline activity..."
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+        />
 
-              setImportingExcel(true);
+        <select value={category} onChange={(event) => setCategory(event.target.value)}>
+          <option value="all">All categories</option>
+          {categories.map((item) => (
+            <option key={item} value={item}>
+              {item}
+            </option>
+          ))}
+        </select>
 
-              try {
-                const result = await importWbsExcelFile(projectId, file);
+        <button type="button" onClick={addActivity}>+ Activity</button>
 
-                if (result) {
-                  await loadWorkspace(projectId);
+        <input
+          ref={excelInputRef}
+          type="file"
+          accept=".xlsx,.xls"
+          style={{ display: "none" }}
+          onChange={async (event) => {
+            const file = event.target.files?.[0];
+            event.target.value = "";
+            if (!file) return;
 
-                  window.alert(
-                    `Import completato: ${result.activitiesCount} attività. ` +
-                      `Peso totale: ${result.totalWeight.toFixed(2)}%.`
-                  );
-                }
-              } catch (err) {
-                window.alert(err.message || "Errore import Excel WBS");
-              } finally {
-                setImportingExcel(false);
+            setImportingExcel(true);
+
+            try {
+              const result = await importWbsExcelFile(projectId, file);
+              if (result) {
+                await loadWorkspace(projectId);
+                window.alert(`Import completato: ${result.activitiesCount} attività. Peso totale: ${result.totalWeight.toFixed(2)}%.`);
               }
-            }}
-          />
+            } catch (err) {
+              window.alert(err.message || "Errore import Excel WBS");
+            } finally {
+              setImportingExcel(false);
+            }
+          }}
+        />
 
-          <button
-            type="button"
-            className="cw-secondary-action"
-            onClick={() => excelInputRef.current?.click()}
-            disabled={importingExcel}
-          >
-            {importingExcel ? "Reading Excel..." : "Import Excel"}
-          </button>
+        <button
+          type="button"
+          className="cw-secondary-action"
+          onClick={() => excelInputRef.current?.click()}
+          disabled={importingExcel}
+        >
+          {importingExcel ? "Reading Excel..." : "Import WBS"}
+        </button>
 
-          <button
-            type="button"
-            className="cw-secondary-action"
-            onClick={downloadWbsTemplate}
-          >
-            Download Template
-          </button>
-        </div>
+        <button type="button" className="cw-secondary-action" onClick={downloadWbsTemplate}>
+          Download Template
+        </button>
 
-        <div className="cw-toolbar-danger">
-          <button
-            type="button"
-            className="cw-danger-action"
-            onClick={deleteSelectedActivities}
-            disabled={selectedIds.size === 0}
-          >
-            Delete Selected
-            {selectedIds.size > 0 ? ` (${selectedIds.size})` : ""}
-          </button>
+        <button type="button" className="cw-danger-action" onClick={deleteSelectedActivities} disabled={selectedIds.size === 0}>
+          Delete selected ({selectedIds.size})
+        </button>
 
-          <button
-            type="button"
-            className="cw-danger-action cw-danger-action-strong"
-            onClick={deleteAllActivities}
-          >
-            Delete All WBS
-          </button>
-        </div>
+        <button type="button" className="cw-danger-action" onClick={deleteAllActivities}>
+          Delete all WBS
+        </button>
       </section>
 
       <section className="cw-grid-shell excel-shell">

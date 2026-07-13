@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import {
   activateRecoveryRevision,
@@ -12,6 +12,10 @@ import {
   updateRecoveryRevision,
 } from "../../features/forecast/services/recoveryForecastService";
 import { supabase } from "../../lib/supabaseClient";
+import {
+  exportRecoveryExcel,
+  importRecoveryExcel,
+} from "../../features/forecast/excel/recoveryExcelService";
 import "../../styles/forecast.css";
 
 const ACTUAL_WEEKLY_STATUSES = new Set(["SUBMITTED", "VALIDATED", "APPROVED", "LOCKED"]);
@@ -150,6 +154,8 @@ export default function ProjectForecast() {
   const [dirtyIds, setDirtyIds] = useState(new Set());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [importingExcel, setImportingExcel] = useState(false);
+  const recoveryExcelInputRef = useRef(null);
 
   const metrics = useMemo(() => {
     const totalActivities = rows.length;
@@ -452,6 +458,76 @@ export default function ProjectForecast() {
     }
   }
 
+  function handleExportRecoveryExcel() {
+    exportRecoveryExcel({
+      projectId,
+      revision: selectedRevision,
+      rows,
+    });
+  }
+
+  async function handleImportRecoveryExcel(event) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file) return;
+
+    setImportingExcel(true);
+
+    try {
+      const result = await importRecoveryExcel(file, rows);
+
+      setRows((current) =>
+        current.map((row) => {
+          const update = result.updates[row.activityId];
+
+          return update
+            ? {
+                ...row,
+                ...update,
+              }
+            : row;
+        })
+      );
+
+      setDirtyIds(
+        (current) =>
+          new Set([
+            ...current,
+            ...Object.keys(result.updates),
+          ])
+      );
+
+      const warnings = [];
+
+      if (result.unknownCodes.length) {
+        warnings.push(
+          `Codici non trovati: ${result.unknownCodes.join(", ")}`
+        );
+      }
+
+      if (result.duplicateCodes.length) {
+        warnings.push(
+          `Codici duplicati ignorati: ${result.duplicateCodes.join(", ")}`
+        );
+      }
+
+      window.alert(
+        [
+          `Import completato: ${result.updatedRows} attività aggiornate.`,
+          "Le modifiche sono in bozza: premi Save per salvarle.",
+          ...warnings,
+        ].join("\n")
+      );
+    } catch (error) {
+      window.alert(
+        error.message || "Errore durante l'import Recovery Excel."
+      );
+    } finally {
+      setImportingExcel(false);
+    }
+  }
+
   if (loading) {
     return (
       <main className="forecast-page">
@@ -507,62 +583,157 @@ export default function ProjectForecast() {
 
   return (
     <main className="forecast-page">
-      <header className="forecast-hero">
-        <div>
+      <header className="forecast-enterprise-header">
+        <div className="forecast-enterprise-title">
           <span>Recovery Forecast</span>
           <h1>EPC Recovery Plan</h1>
           <p>
-            Pianifica il recupero sul residuo reale: Baseline Qty meno Actual Qty da Weekly.
-            La baseline WBS non viene modificata.
+            Pianifica il recupero sul residuo reale: Baseline Qty meno
+            Actual Qty derivata dalle Weekly approvate.
           </p>
         </div>
 
-        <div className="forecast-actions">
-          <select value={selectedRevisionId} onChange={(event) => setSelectedRevisionId(event.target.value)}>
-            {revisions.map((revision) => (
-              <option key={revision.id} value={revision.id}>
-                Rev.{revision.revisionNumber} · {revision.status}
-              </option>
-            ))}
-          </select>
+        <div className="forecast-revision-panel">
+          <label>
+            <span>Revision</span>
+            <select
+              value={selectedRevisionId}
+              onChange={(event) =>
+                setSelectedRevisionId(event.target.value)
+              }
+            >
+              {revisions.map((revision) => (
+                <option key={revision.id} value={revision.id}>
+                  Rev.{revision.revisionNumber} · {revision.status}
+                </option>
+              ))}
+            </select>
+          </label>
 
-          <input
-            value={selectedRevision?.title || ""}
-            onChange={(event) => updateRevision("title", event.target.value)}
-            placeholder="Revision title"
-          />
+          <label className="forecast-revision-title">
+            <span>Title</span>
+            <input
+              value={selectedRevision?.title || ""}
+              onChange={(event) =>
+                updateRevision("title", event.target.value)
+              }
+              placeholder="Revision title"
+            />
+          </label>
 
-          <input
-            type="date"
-            value={selectedRevision?.issueDate || ""}
-            onChange={(event) => updateRevision("issueDate", event.target.value)}
-          />
+          <label>
+            <span>Issue Date</span>
+            <input
+              type="date"
+              value={selectedRevision?.issueDate || ""}
+              onChange={(event) =>
+                updateRevision("issueDate", event.target.value)
+              }
+            />
+          </label>
+        </div>
+      </header>
 
+      <section className="forecast-command-bar">
+        <div className="forecast-status-copy">
+          <span
+            className={
+              isActive
+                ? "forecast-status forecast-status-active"
+                : "forecast-status forecast-status-draft"
+            }
+          >
+            <i />
+            {isActive
+              ? `Rev.${selectedRevision.revisionNumber} active`
+              : `Rev.${selectedRevision.revisionNumber} draft`}
+          </span>
+
+          <small>
+            {canSave
+              ? `${dirtyIds.size} activity change${
+                  dirtyIds.size === 1 ? "" : "s"
+                } pending`
+              : "All Recovery changes saved"}
+          </small>
+        </div>
+
+        <div className="forecast-primary-actions">
           <button type="button" onClick={handleCreateRevision}>
-            + New Rev
+            + New Revision
           </button>
 
-          <button type="button" onClick={handleActivateRevision} disabled={isActive}>
+          <button
+            type="button"
+            onClick={handleActivateRevision}
+            disabled={isActive}
+          >
             {isActive ? "Active" : "Set Active"}
           </button>
 
-          <button type="button" className="forecast-danger" onClick={handleDeleteRevision} disabled={revisions.length <= 1}>
-            Delete Rev
+          <input
+            ref={recoveryExcelInputRef}
+            type="file"
+            accept=".xlsx,.xls"
+            hidden
+            onChange={handleImportRecoveryExcel}
+          />
+
+          <button
+            type="button"
+            className="forecast-secondary-button"
+            disabled={importingExcel}
+            onClick={() => recoveryExcelInputRef.current?.click()}
+          >
+            {importingExcel ? "Reading Excel..." : "Import Excel"}
           </button>
 
-          <button type="button" className="forecast-danger" onClick={handleArchiveRecoveryPlan}>
+          <button
+            type="button"
+            className="forecast-secondary-button"
+            onClick={handleExportRecoveryExcel}
+            disabled={!rows.length}
+          >
+            Export Excel
+          </button>
+
+          <button
+            type="button"
+            className="forecast-save-button"
+            onClick={handleSave}
+            disabled={!canSave || saving}
+          >
+            {saving
+              ? "Saving..."
+              : `Save${dirtyIds.size ? ` (${dirtyIds.size})` : ""}`}
+          </button>
+        </div>
+
+        <div className="forecast-danger-actions">
+          <button
+            type="button"
+            onClick={handleDeleteRevision}
+            disabled={revisions.length <= 1}
+          >
+            Delete Revision
+          </button>
+
+          <button
+            type="button"
+            onClick={handleArchiveRecoveryPlan}
+          >
             Archive Plan
           </button>
 
-          <button type="button" className="forecast-danger" onClick={handleDeleteRecoveryPlan}>
+          <button
+            type="button"
+            className="forecast-delete-plan"
+            onClick={handleDeleteRecoveryPlan}
+          >
             Delete Plan
           </button>
-
-          <button type="button" onClick={handleSave} disabled={!canSave || saving}>
-            {saving ? "Saving..." : `Save (${dirtyIds.size})`}
-          </button>
         </div>
-      </header>
+      </section>
 
       <section className="forecast-note-panel">
         <label>

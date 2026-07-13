@@ -151,6 +151,8 @@ function ProjectCard({ project, onOpen, onEdit, onDelete }) {
 }
 
 export default function Portfolio() {
+  const [exportingPpt, setExportingPpt] = useState(false);
+  const [exportPptError, setExportPptError] = useState("");
   const navigate = useNavigate();
 
   const [portfolio, setPortfolio] = useState(null);
@@ -319,6 +321,24 @@ export default function Portfolio() {
     );
   }
 
+  async function handleExportWeeklyPpt() {
+    if (exportingPpt) return;
+
+    setExportingPpt(true);
+    setExportPptError("");
+
+    try {
+      await generateWeeklyManagementPpt();
+    } catch (exportError) {
+      console.error("Weekly PPT export failed:", exportError);
+      setExportPptError(
+        exportError?.message || "Unable to generate the Weekly Management PPT."
+      );
+    } finally {
+      setExportingPpt(false);
+    }
+  }
+
   return (
     <main className="portfolio-page">
       <section className="portfolio-hero">
@@ -335,9 +355,10 @@ export default function Portfolio() {
           <button
             className="secondary-button"
             type="button"
-            onClick={generateWeeklyManagementPpt}
+            onClick={handleExportWeeklyPpt}
+            disabled={exportingPpt}
           >
-            Export Weekly PPT
+            {exportingPpt ? "Generating PPT..." : "Export Weekly PPT"}
           </button>
 
           <button className="new-project-button" type="button" onClick={openCreateForm}>
@@ -347,6 +368,11 @@ export default function Portfolio() {
       </section>
 
       {error ? <div className="error-banner">{error}</div> : null}
+      {exportPptError ? (
+        <div className="error-banner">
+          PPT export error: {exportPptError}
+        </div>
+      ) : null}
 
       {formVisible ? (
         <section className="project-form-panel">

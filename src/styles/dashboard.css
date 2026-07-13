@@ -639,3 +639,63 @@
     min-height: 60px;
   }
 }
+
+/* Control Room header — compact project controls */
+.dashboard-actions-compact {
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 0.7rem;
+  flex-wrap: nowrap;
+}
+
+.dashboard-project-control {
+  display: flex;
+  min-width: min(360px, 42vw);
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.dashboard-project-control > span {
+  color: #8290a6;
+  font-size: 0.67rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.dashboard-project-control select {
+  width: 100%;
+  min-height: 42px;
+  box-sizing: border-box;
+}
+
+.dashboard-refresh-button {
+  width: 42px;
+  min-width: 42px;
+  height: 42px;
+  padding: 0 !important;
+  border-radius: 12px !important;
+  color: #bfdbfe !important;
+  border: 1px solid rgba(96, 165, 250, 0.35) !important;
+  background: rgba(37, 99, 235, 0.18) !important;
+  font-size: 1.35rem !important;
+  line-height: 1;
+}
+
+.dashboard-refresh-button:hover {
+  border-color: rgba(96, 165, 250, 0.75) !important;
+  background: rgba(37, 99, 235, 0.32) !important;
+}
+
+@media (max-width: 850px) {
+  .dashboard-actions-compact {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .dashboard-project-control {
+    min-width: 0;
+    flex: 1;
+  }
+}

@@ -1,6 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "../../lib/supabaseClient";
+import {
+  exportWeeklyExcel,
+  importWeeklyExcel,
+} from "../../features/weekly/excel/weeklyExcelService";
 import "../../styles/construction-workspace.css";
 
 function iso(date) {
@@ -73,6 +77,8 @@ export default function ProjectWeekly() {
   const [discipline, setDiscipline] = useState("all");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [importingExcel, setImportingExcel] = useState(false);
+  const weeklyExcelInputRef = useRef(null);
 
   const locked = isActualStatus(report?.status);
 
@@ -329,90 +335,291 @@ export default function ProjectWeekly() {
       return;
     }
 
-    if (!window.confirm("Confermi il submit della Weekly? Dopo il submit non sarà più modificabile dall'EPC.")) return;
+    if (
+      !window.confirm(
+        "Confermi il submit della Weekly? Dopo il submit non sarà più modificabile dall'EPC."
+      )
+    ) {
+      return;
+    }
 
     await saveWeekly("SUBMITTED");
   }
 
+  function handleExportWeeklyExcel() {
+    const selectedProject = projects.find(
+      (project) => project.id === projectId
+    );
+
+    exportWeeklyExcel({
+      project: selectedProject,
+      weekStart: week.weekStart,
+      weekEnd: week.weekEnd,
+      activities: operationalActivities,
+      cumulativeValues,
+      weeklyValues,
+    });
+  }
+
+  async function handleImportWeeklyExcel(event) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file) return;
+
+    if (locked) {
+      window.alert(
+        "La Weekly è bloccata. Esegui Admin Unlock prima di importare."
+      );
+      return;
+    }
+
+    setImportingExcel(true);
+
+    try {
+      const result = await importWeeklyExcel(
+        file,
+        operationalActivities
+      );
+
+      setWeeklyValues((current) => ({
+        ...current,
+        ...result.values,
+      }));
+
+      const warnings = [];
+
+      if (result.unknownCodes.length) {
+        warnings.push(
+          `Codici non trovati: ${result.unknownCodes.join(", ")}`
+        );
+      }
+
+      if (result.duplicateCodes.length) {
+        warnings.push(
+          `Codici duplicati ignorati: ${result.duplicateCodes.join(", ")}`
+        );
+      }
+
+      window.alert(
+        [
+          `Import completato: ${result.importedRows} attività aggiornate.`,
+          "I valori sono in bozza: premi Save Draft per salvarli.",
+          ...warnings,
+        ].join("\n")
+      );
+    } catch (error) {
+      window.alert(
+        error.message || "Errore durante l'import Weekly Excel."
+      );
+    } finally {
+      setImportingExcel(false);
+    }
+  }
+
   return (
     <main className="construction-workspace">
-      <header className="cw-workspace-header">
-        <div>
+      <header className="weekly-enterprise-header">
+        <div className="weekly-enterprise-title">
           <span>EPC Production Area</span>
           <h1>Weekly Production</h1>
-          <p>Inserisci solo le quantità prodotte. Baseline e pesi sono in sola lettura.</p>
+          <p>
+            Inserisci esclusivamente le quantità prodotte. Baseline e pesi
+            rimangono in sola lettura.
+          </p>
         </div>
 
-        <div className="cw-project-select">
-          <label>Project</label>
-          <select value={projectId} onChange={(event) => setProjectId(event.target.value)}>
+        <label className="weekly-project-select">
+          <span>Project</span>
+          <select
+            value={projectId}
+            onChange={(event) => setProjectId(event.target.value)}
+          >
             {projects.map((project) => (
               <option key={project.id} value={project.id}>
                 {project.code} · {project.name}
               </option>
             ))}
           </select>
-        </div>
+        </label>
       </header>
 
-      <section className="weekly-period-bar">
-        <button type="button" onClick={() => setWeekStart((current) => shiftMonday(current, -1))}>
-          ← Previous week
+      <section className="weekly-period-panel">
+        <button
+          type="button"
+          onClick={() =>
+            setWeekStart((current) => shiftMonday(current, -1))
+          }
+        >
+          ← Previous Week
         </button>
 
-        <div>
-          <span>Weekly Period</span>
-          <strong>{week.weekStart} / {week.weekEnd}</strong>
-          <small>Status: {report?.status || "DRAFT"}</small>
+        <div className="weekly-period-copy">
+          <span>Reporting Week</span>
+          <strong>
+            {week.weekStart} — {week.weekEnd}
+          </strong>
+          <small
+            className={`weekly-status weekly-status-${String(
+              report?.status || "DRAFT"
+            ).toLowerCase()}`}
+          >
+            {report?.status || "DRAFT"}
+          </small>
         </div>
 
-        <button type="button" onClick={() => setWeekStart((current) => shiftMonday(current, 1))}>
-          Next week →
+        <button
+          type="button"
+          onClick={() =>
+            setWeekStart((current) => shiftMonday(current, 1))
+          }
+        >
+          Next Week →
         </button>
       </section>
 
-      <section className="cw-metrics">
-        <div><span>Status</span><strong>{report?.status || "DRAFT"}</strong></div>
-        <div><span>Activities</span><strong>{operationalActivities.length}</strong></div>
-        <div><span>Rows Updated</span><strong>{activeRows}</strong></div>
-        <div><span>Weekly Qty</span><strong>{weeklyTotal}</strong></div>
-        <div><span>Historical Reports</span><strong>{reports.length}</strong></div>
+      <section className="weekly-summary-strip">
+        <article>
+          <span>Status</span>
+          <strong>{report?.status || "DRAFT"}</strong>
+        </article>
+
+        <article>
+          <span>Activities</span>
+          <strong>{operationalActivities.length}</strong>
+        </article>
+
+        <article>
+          <span>Rows Updated</span>
+          <strong>{activeRows}</strong>
+        </article>
+
+        <article>
+          <span>Weekly Qty</span>
+          <strong>{weeklyTotal}</strong>
+        </article>
+
+        <article>
+          <span>Historical Reports</span>
+          <strong>{reports.length}</strong>
+        </article>
       </section>
 
-      <section className="cw-save-bar">
+      <section className="weekly-command-bar">
         <div>
-          <strong>{locked ? "Weekly locked" : "Weekly editable"}</strong>
-          <span>{locked ? "Questa Weekly è stata inviata e alimenta la Control Room." : "Salva Draft durante la settimana. Submit quando vuoi inviarla."}</span>
+          <span
+            className={
+              locked
+                ? "weekly-edit-state weekly-edit-state-locked"
+                : "weekly-edit-state weekly-edit-state-open"
+            }
+          >
+            <i />
+            {locked ? "Weekly locked" : "Weekly editable"}
+          </span>
+
+          <small>
+            {locked
+              ? "La Weekly è stata inviata e alimenta la Control Room."
+              : "Importa o inserisci le quantità, poi salva la bozza o esegui il submit."}
+          </small>
         </div>
 
-        <div className="weekly-actions">
-          <button type="button" onClick={() => saveWeekly("DRAFT")} disabled={saving || locked}>
+        <div className="weekly-command-actions">
+          <button
+            type="button"
+            className="weekly-save-button"
+            onClick={() => saveWeekly("DRAFT")}
+            disabled={saving || locked}
+          >
             {saving ? "Saving..." : "Save Draft"}
           </button>
-          <button type="button" className="cw-secondary-action" onClick={submitWeekly} disabled={saving || locked}>
+
+          <button
+            type="button"
+            className="weekly-submit-button"
+            onClick={submitWeekly}
+            disabled={saving || locked}
+          >
             Submit Weekly
           </button>
 
-          {locked && (
-            <button type="button" className="cw-danger-action" onClick={unlockWeekly} disabled={saving}>
+          {locked ? (
+            <button
+              type="button"
+              className="weekly-danger-button"
+              onClick={unlockWeekly}
+              disabled={saving}
+            >
               Admin Unlock
             </button>
-          )}
+          ) : null}
 
-          {report?.id && (
-            <button type="button" className="cw-danger-action" onClick={deleteCurrentWeekly} disabled={saving}>
+          {report?.id ? (
+            <button
+              type="button"
+              className="weekly-danger-button"
+              onClick={deleteCurrentWeekly}
+              disabled={saving}
+            >
               Delete Weekly
             </button>
-          )}
+          ) : null}
         </div>
       </section>
 
-      <section className="cw-toolbar weekly-toolbar">
-        <input placeholder="Search production activity..." value={search} onChange={(event) => setSearch(event.target.value)} />
-        <select value={discipline} onChange={(event) => setDiscipline(event.target.value)}>
-          <option value="all">All disciplines</option>
-          {disciplines.map((item) => <option key={item} value={item}>{item}</option>)}
-        </select>
+      <section className="weekly-filter-toolbar">
+        <div className="weekly-filter-fields">
+          <label>
+            <span>Search</span>
+            <input
+              placeholder="Code or activity..."
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+          </label>
+
+          <label>
+            <span>Discipline</span>
+            <select
+              value={discipline}
+              onChange={(event) => setDiscipline(event.target.value)}
+            >
+              <option value="all">All disciplines</option>
+              {disciplines.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        <div className="weekly-excel-actions">
+          <input
+            ref={weeklyExcelInputRef}
+            type="file"
+            accept=".xlsx,.xls"
+            hidden
+            onChange={handleImportWeeklyExcel}
+          />
+
+          <button
+            type="button"
+            onClick={() => weeklyExcelInputRef.current?.click()}
+            disabled={locked || importingExcel}
+          >
+            {importingExcel ? "Reading Excel..." : "Import Excel"}
+          </button>
+
+          <button
+            type="button"
+            onClick={handleExportWeeklyExcel}
+            disabled={!operationalActivities.length}
+          >
+            Export Excel
+          </button>
+        </div>
       </section>
 
       <section className="cw-grid-shell">

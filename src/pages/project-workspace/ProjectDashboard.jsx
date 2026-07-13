@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import {
   Area,
   AreaChart,
@@ -13,7 +13,6 @@ import {
   YAxis,
 } from "recharts";
 import {
-  createAndActivateRecoveryPlan,
 } from "../../features/forecast/services/recoveryForecastService";
 import { supabase } from "../../lib/supabaseClient";
 import { loadRealConstructionDashboard } from "../../services/constructionEngine.service";
@@ -121,16 +120,6 @@ export default function ProjectDashboard() {
     }
   }, [loadDashboard, projectId]);
 
-  async function handleCreateRecoveryPlan() {
-    if (!projectId) return;
-
-    try {
-      await createAndActivateRecoveryPlan(projectId);
-      navigate(`/projects/${projectId}/forecast`);
-    } catch (err) {
-      window.alert(err.message || "Errore creazione Recovery Plan");
-    }
-  }
 
   function handleProjectChange(event) {
     const nextProjectId = event.target.value;
@@ -155,28 +144,27 @@ export default function ProjectDashboard() {
           <p>Executive view da WBS baseline, Weekly actual production e Construction Engine.</p>
         </div>
 
-        <div className="dashboard-actions">
-          <select value={projectId} onChange={handleProjectChange}>
-            {projects.map((project) => (
-              <option key={project.id} value={project.id}>
-                {project.code} · {project.name}
-              </option>
-            ))}
-          </select>
+        <div className="dashboard-actions dashboard-actions-compact">
+          <label className="dashboard-project-control">
+            <span>Project</span>
+            <select value={projectId} onChange={handleProjectChange}>
+              {projects.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.code} · {project.name}
+                </option>
+              ))}
+            </select>
+          </label>
 
-          <button type="button" onClick={() => loadDashboard(projectId)}>
-            Refresh
+          <button
+            className="dashboard-refresh-button"
+            type="button"
+            aria-label="Refresh dashboard"
+            title="Refresh dashboard"
+            onClick={() => loadDashboard(projectId)}
+          >
+            ↻
           </button>
-
-          <Link to={`/projects/${projectId}/wbs`}>WBS</Link>
-          <Link to={`/projects/${projectId}/weekly`}>Weekly</Link>
-          {dashboard?.recoveryPlan?.active ? (
-            <Link to={`/projects/${projectId}/forecast`}>Recovery</Link>
-          ) : (
-            <button type="button" onClick={handleCreateRecoveryPlan}>
-              + Recovery
-            </button>
-          )}
         </div>
       </header>
 

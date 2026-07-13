@@ -419,7 +419,18 @@ function hasExecutiveContent(notes) {
 }
 
 function addProjectExecutiveNotesSlide(ppt, snapshot, index) {
-  const notes = snapshot.executiveNotes;
+  const notes = snapshot.executiveNotes || {
+    status: "MISSING",
+    weekStart: null,
+    weekEnd: null,
+    summary: "",
+    achievements: [],
+    challenges: [],
+    risks: [],
+    managementRequests: [],
+    nextWeek: [],
+  };
+
   if (!hasExecutiveContent(notes)) return;
 
   const slide = ppt.addSlide();
@@ -498,24 +509,32 @@ function addProjectExecutiveNotesSlide(ppt, snapshot, index) {
 }
 
 function addDecisionLogSlide(ppt, report) {
-  const requests = report.projects.flatMap((snapshot) =>
-    snapshot.executiveNotes.managementRequests.map((item) => ({
+  const requests = report.projects.flatMap((snapshot) => {
+    const notes = snapshot.executiveNotes || {};
+    const items = Array.isArray(notes.managementRequests)
+      ? notes.managementRequests
+      : [];
+
+    return items.map((item) => ({
       project: snapshot.project.name,
       request: item.text,
-      status: snapshot.executiveNotes.status,
-    }))
-  );
+      status: notes.status || "MISSING",
+    }));
+  });
 
-  const risks = report.projects.flatMap((snapshot) =>
-    snapshot.executiveNotes.risks
+  const risks = report.projects.flatMap((snapshot) => {
+    const notes = snapshot.executiveNotes || {};
+    const items = Array.isArray(notes.risks) ? notes.risks : [];
+
+    return items
       .filter((item) => item.level === "HIGH" || item.level === "CRITICAL")
       .map((item) => ({
         project: snapshot.project.name,
         risk: item.text,
         level: item.level,
         owner: item.owner || "-",
-      }))
-  );
+      }));
+  });
 
   if (!requests.length && !risks.length) return;
 
