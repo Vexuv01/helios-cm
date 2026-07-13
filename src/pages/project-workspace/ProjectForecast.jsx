@@ -20,6 +20,7 @@ import "../../styles/forecast.css";
 import {
   buildActualQtyMap,
   buildRecentWeeklyQtyMap,
+  buildRecoveryMetrics,
   daysBetween,
   isActualReport,
   mergeRows,
@@ -44,46 +45,10 @@ export default function ProjectForecast() {
   const [importingExcel, setImportingExcel] = useState(false);
   const recoveryExcelInputRef = useRef(null);
 
-  const metrics = useMemo(() => {
-    const totalActivities = rows.length;
-    const forecasted = rows.filter((row) => row.forecastStart && row.forecastFinish).length;
-
-    const totalWeight = rows.reduce((sum, row) => sum + toNumber(row.weightPercent), 0);
-    const forecastedWeight = rows
-      .filter((row) => row.forecastStart && row.forecastFinish)
-      .reduce((sum, row) => sum + toNumber(row.weightPercent), 0);
-
-    const totalBaselineQty = rows.reduce((sum, row) => sum + toNumber(row.baselineQuantity), 0);
-    const totalActualQty = rows.reduce((sum, row) => sum + toNumber(row.actualQuantity), 0);
-    const totalRemainingQty = rows.reduce((sum, row) => sum + toNumber(row.remainingQuantity), 0);
-
-    const baselineFinish = rows.map((row) => row.plannedFinish).filter(Boolean).sort().at(-1);
-
-    const forecastFinish = rows
-      .map((row) => row.forecastFinish || row.plannedFinish)
-      .filter(Boolean)
-      .sort()
-      .at(-1);
-
-    const highRiskActivities = rows.filter((row) => {
-      const weeks = row.forecastFinish ? Math.max(1, Math.ceil(remainingDays(row.forecastFinish) / 7)) : 0;
-      const required = weeks > 0 ? row.remainingQuantity / weeks : 0;
-      return productivityRisk(required, row.currentWeeklyProductivity) === "HIGH";
-    }).length;
-
-    return {
-      totalActivities,
-      forecasted,
-      totalWeight: Number(totalWeight.toFixed(2)),
-      forecastedWeight: Number(forecastedWeight.toFixed(2)),
-      totalBaselineQty: Number(totalBaselineQty.toFixed(2)),
-      totalActualQty: Number(totalActualQty.toFixed(2)),
-      totalRemainingQty: Number(totalRemainingQty.toFixed(2)),
-      baselineFinish: baselineFinish || "—",
-      forecastFinish: forecastFinish || "—",
-      highRiskActivities,
-    };
-  }, [rows]);
+  const metrics = useMemo(
+    () => buildRecoveryMetrics(rows),
+    [rows]
+  );
 
   const loadPage = useCallback(async () => {
     setLoading(true);
