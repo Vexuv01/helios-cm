@@ -1,5 +1,7 @@
 import { parseProjectWorkbook } from "../parser/projectWorkbookParser.js";
 import { detectImportMode } from "../domain/detectImportMode.js";
+import { buildImportPlan } from "../domain/buildImportPlan.js";
+import { buildExecutionPipeline } from "../domain/buildExecutionPipeline.js";
 import { analyzeWorkbook } from "../analysis/workbookAnalysis.js";
 import { parseWbsExcelFile } from "../../wbs/import/excelParser.js";
 
@@ -23,9 +25,15 @@ export async function syncProject({
     wbsActivities,
   });
 
+  const plan = buildImportPlan(summary);
+
+  const pipeline = buildExecutionPipeline(plan);
+
   return {
     mode,
     summary,
+    plan,
+    pipeline,
     workbook: parsedWorkbook.workbook,
     wbsActivities,
   };
