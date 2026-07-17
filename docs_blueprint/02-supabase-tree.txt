@@ -1,0 +1,10 @@
+supabase/archive/001_dev_rls_policies.sql
+supabase/migrations/002_construction_baseline_wbs.sql
+supabase/migrations/003_wbs_hierarchy.sql
+supabase/migrations/20260708_0001_real_wbs_weekly.sql
+supabase/migrations/20260708_construction_documents.sql
+supabase/migrations/202607081900_construction_photos.sql
+supabase/migrations/20260709_0001_enterprise_profiles.sql
+supabase/migrations/20260710_0001_recovery_forecast.sql
+supabase/migrations/20260713_0002_executive_notes_structured.sql
+supabase/README.md

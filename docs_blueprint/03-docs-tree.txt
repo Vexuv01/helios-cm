@@ -1,0 +1,9 @@
+docs/00_Audit/ALPHA_BACKLOG.md
+docs/00_Audit/ALPHA_READINESS_AUDIT.md
+docs/00_Audit/PROJECT_STRUCTURE_SNAPSHOT.md
+docs/00_Audit/SUPABASE_SCHEMA_SNAPSHOT.md
+docs/architecture/ARCHITECTURE_AUDIT.md
+docs/architecture/BUILD_BASELINE.txt
+docs/architecture/BUNDLE_BASELINE.md
+docs/architecture/HELIOS_ARCHITECTURE.md
+docs/architecture/IDENTITY_MODULE_ARCHITECTURE.md

@@ -1,0 +1,4 @@
+./vercel.json
+./vite.config.js
+./package.json
+./eslint.config.js

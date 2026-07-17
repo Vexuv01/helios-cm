@@ -2,6 +2,7 @@ import { NavLink, Outlet, Link } from "react-router-dom";
 import { ProjectProvider } from "../context/ProjectContext";
 import { useProject } from "../context/useProject";
 import "../../../styles/project-workspace.css";
+import ProjectSyncBar from "../../project-import/components/ProjectSyncBar";
 
 const workspaceTabs = [
   { label: "Control Room", path: "dashboard" },
@@ -49,6 +50,8 @@ function ProjectWorkspaceShell() {
           </p>
 
           <h1>{currentProject?.name}</h1>
+
+          <ProjectSyncBar />
         </div>
 
       </header>

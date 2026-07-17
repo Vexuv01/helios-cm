@@ -1,5 +1,5 @@
 import { supabase } from "../../../lib/supabaseClient";
-import { parseWbsExcelFile } from "./excelParser";
+import { syncProject } from "../../project-import/services/projectImportService.js";
 import { validateWbsActivities } from "./excelValidator";
 
 function toDb(projectId, activity) {
@@ -98,7 +98,12 @@ async function resetProjectWeekly(projectId) {
 }
 
 export async function importWbsExcelFile(projectId, file) {
-  const activities = await parseWbsExcelFile(file);
+  const { wbsActivities: activities } = await syncProject({
+    file,
+    activitiesCount: 0,
+    reportsCount: 0,
+  });
+
   const validation = validateWbsActivities(activities);
 
   if (!validation.valid) {
