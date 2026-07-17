@@ -16,6 +16,9 @@ const ConstructionWorkspace = lazy(() =>
 const ProjectWeekly = lazy(() =>
   import("../pages/project-workspace/ProjectWeekly")
 );
+const ProjectCashFlow = lazy(() =>
+  import("../pages/project-workspace/ProjectCashFlow")
+);
 const ProjectForecast = lazy(() =>
   import("../pages/project-workspace/ProjectForecast")
 );
@@ -85,6 +88,7 @@ export default function AppRoutes() {
           <Route path="wbs" element={<ConstructionWorkspace />} />
           <Route path="weekly" element={<ProjectWeekly />} />
           <Route path="forecast" element={<ProjectForecast />} />
+          <Route path="cash-flow" element={<ProjectCashFlow />} />
           <Route path="executive-notes" element={<ProjectExecutiveNotes />} />
           <Route path="documents" element={<ProjectDocuments />} />
           <Route path="issues" element={<ProjectIssues />} />
