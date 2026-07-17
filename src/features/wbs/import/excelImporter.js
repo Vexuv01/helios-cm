@@ -1,5 +1,5 @@
 import { supabase } from "../../../lib/supabaseClient";
-import { syncProject } from "../../project-import/services/projectImportService.js";
+import { parseWbsExcelFile } from "./excelParser";
 import { validateWbsActivities } from "./excelValidator";
 
 function toDb(projectId, activity) {
@@ -69,25 +69,21 @@ async function resetProjectWeekly(projectId) {
 
   const reportIds = (reports || []).map((report) => report.id);
 
-  if (reportIds.length > 0) {
-    const deleteEntriesByReport = await supabase
+  if (reportIds.length) {
+    const result = await supabase
       .from("weekly_entries")
       .delete()
       .in("weekly_report_id", reportIds);
 
-    if (deleteEntriesByReport.error) {
-      throw new Error(deleteEntriesByReport.error.message);
-    }
+    if (result.error) throw new Error(result.error.message);
   }
 
-  const deleteEntriesByProject = await supabase
+  const deleteEntries = await supabase
     .from("weekly_entries")
     .delete()
     .eq("project_id", projectId);
 
-  if (deleteEntriesByProject.error) {
-    throw new Error(deleteEntriesByProject.error.message);
-  }
+  if (deleteEntries.error) throw new Error(deleteEntries.error.message);
 
   const deleteReports = await supabase
     .from("weekly_reports")
@@ -98,11 +94,7 @@ async function resetProjectWeekly(projectId) {
 }
 
 export async function importWbsExcelFile(projectId, file) {
-  const { wbsActivities: activities } = await syncProject({
-    file,
-    activitiesCount: 0,
-    reportsCount: 0,
-  });
+  const activities = await parseWbsExcelFile(file);
 
   const validation = validateWbsActivities(activities);
 
@@ -110,9 +102,9 @@ export async function importWbsExcelFile(projectId, file) {
     throw new Error(validation.errors.join("\n"));
   }
 
-  const confirmed = window.confirm(buildPreviewMessage(file, validation, activities));
-
-  if (!confirmed) return null;
+  if (!window.confirm(buildPreviewMessage(file, validation, activities))) {
+    return null;
+  }
 
   await resetProjectWeekly(projectId);
 
@@ -125,7 +117,9 @@ export async function importWbsExcelFile(projectId, file) {
 
   const insertResult = await supabase
     .from("wbs_activities")
-    .insert(activities.map((activity) => toDb(projectId, activity)));
+    .insert(
+      activities.map((activity) => toDb(projectId, activity))
+    );
 
   if (insertResult.error) throw new Error(insertResult.error.message);
 
