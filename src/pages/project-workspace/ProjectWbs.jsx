@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useProject } from "../../features/projects/context/useProject";
 import {
   EMPTY_WBS_ACTIVITY,
-  importPvAgripvWbsTemplate,
   loadProjectWbs,
   removeWbsActivity,
   saveWbsActivity,
@@ -61,9 +60,10 @@ export default function ProjectWbs() {
   const [draftRows, setDraftRows] = useState([]);
   const [expanded, setExpanded] = useState({});
   const [savingId, setSavingId] = useState("");
+  const [importingExcel, setImportingExcel] = useState(false);
   const [selectedActivity, setSelectedActivity] = useState(null);
+  const excelInputRef = useRef(null);
   const [loading, setLoading] = useState(true);
-  const [importing, setImporting] = useState(false);
   const [error, setError] = useState("");
 
   const refreshWbs = useCallback(async () => {
@@ -197,25 +197,15 @@ export default function ProjectWbs() {
       setSavingId("");
     }
   }
+  function handleExcelFileSelected(event) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
 
-  async function importTemplate() {
-    const confirmed = window.confirm(
-      "Import the standard FV/AgriPV WBS template into this project?"
-    );
+    if (!file) return;
 
-    if (!confirmed) return;
-
-    setImporting(true);
-    setError("");
-
-    try {
-      await importPvAgripvWbsTemplate(projectId);
-      await refreshWbs();
-    } catch (err) {
-      setError(err.message || "Unable to import WBS template");
-    } finally {
-      setImporting(false);
-    }
+    setImportingExcel(true);
+    window.alert(`Excel selected: ${file.name}. Parser will be enabled in the next sprint.`);
+    setImportingExcel(false);
   }
 
   function toggleDiscipline(discipline) {
@@ -242,8 +232,19 @@ export default function ProjectWbs() {
         </div>
 
         <div className="wbs-header-actions">
-          <button type="button" onClick={importTemplate} disabled={importing || draftRows.length > 0}>
-            {importing ? "Importing..." : "Import FV/AgriPV Template"}
+          <input
+            ref={excelInputRef}
+            type="file"
+            accept=".xlsx,.xls"
+            style={{ display: "none" }}
+            onChange={handleExcelFileSelected}
+          />
+          <button
+            type="button"
+            onClick={() => excelInputRef.current?.click()}
+            disabled={importingExcel}
+          >
+            {importingExcel ? "Reading Excel..." : "Import Excel"}
           </button>
           <button type="button" className="wbs-secondary" onClick={() => addActivity("GENERAL")}>
             + Add Activity

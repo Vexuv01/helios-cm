@@ -1,0 +1,18 @@
+export const WBS_COLUMN_ALIASES = {
+  code: ["Code", "Codice", "Activity Code", "WBS Code"],
+  discipline: ["Discipline", "Category", "Categoria", "Fase"],
+  name: ["Activity", "Name", "Activity Name", "Attività", "Descrizione"],
+  unit: ["Unit", "U.M.", "UM", "UOM", "UdM"],
+  baselineQuantity: ["Baseline Qty", "Baseline Quantity", "Quantità", "Quantity", "Qty"],
+  installedQuantity: ["Installed Qty", "Installed Quantity", "Installato"],
+  weightPercent: ["Weight %", "Weight", "Peso %", "Peso"],
+  plannedStart: ["Planned Start", "Start", "Inizio Pianificato"],
+  plannedFinish: ["Planned Finish", "Finish", "Fine Pianificata"],
+  actualStart: ["Actual Start", "Inizio Effettivo"],
+  actualFinish: ["Actual Finish", "Fine Effettiva"],
+  contractor: ["Contractor", "Appaltatore", "EPC"],
+  area: ["Area"],
+  subArea: ["SubArea", "Sub Area", "Sottoarea"],
+  system: ["System", "Sistema"],
+  status: ["Status", "Stato"],
+};

@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "../../lib/supabaseClient";
+import { importWbsExcelFile } from "../../features/wbs/import/excelImporter";
+import { downloadWbsTemplate } from "../../features/wbs/import/templateDownloader";
 import { buildWbsWeightModel } from "../../services/wbsWeightEngine";
 import "../../styles/construction-workspace.css";
 
@@ -48,9 +50,11 @@ export default function ConstructionWorkspace() {
   const [dirtyIds, setDirtyIds] = useState(new Set());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [importingExcel, setImportingExcel] = useState(false);
+  const excelInputRef = useRef(null);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("all");
-  const [newActivityCategory, setNewActivityCategory] = useState("CIVIL");
+  const [newActivityCategory] = useState("GENERAL");
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [templateProjectId, setTemplateProjectId] = useState("");
 
@@ -201,6 +205,20 @@ export default function ConstructionWorkspace() {
       (activity) => activity.discipline === newActivityCategory
     ).length;
 
+    const currentWeight = baselineActivities.reduce(
+      (sum, activity) => sum + toNumber(activity.weight_percent),
+      0
+    );
+    const remainingWeight = Math.max(0, Number((100 - currentWeight).toFixed(2)));
+    const defaultWeight = remainingWeight > 0 ? Math.min(remainingWeight, 1) : 0;
+
+    const today = new Date();
+    const nextWeek = new Date(today);
+    nextWeek.setDate(today.getDate() + 7);
+
+    const plannedStart = today.toISOString().slice(0, 10);
+    const plannedFinish = nextWeek.toISOString().slice(0, 10);
+
     const { error } = await supabase.from("wbs_activities").insert({
       project_id: projectId,
       parent_id: null,
@@ -208,10 +226,10 @@ export default function ConstructionWorkspace() {
       name: "Nuova attività",
       discipline: newActivityCategory,
       unit: "unit",
-      baseline_quantity: 0,
-      weight_percent: 0,
-      planned_start: null,
-      planned_finish: null,
+      baseline_quantity: 1,
+      weight_percent: defaultWeight,
+      planned_start: plannedStart,
+      planned_finish: plannedFinish,
       sort_order: maxSort + 1,
       status: "not_started",
       is_group: false,
@@ -304,96 +322,22 @@ export default function ConstructionWorkspace() {
     await loadWorkspace(projectId);
   }
 
-  async function importTemplateIntoCurrentProject() {
-    if (!projectId || !templateProjectId) {
-      alert("Seleziona progetto target e progetto modello.");
-      return;
-    }
-
-    if (projectId === templateProjectId) {
-      alert("Il progetto modello deve essere diverso dal progetto corrente.");
-      return;
-    }
-
-    const sourceProject = projects.find((project) => project.id === templateProjectId);
-    const targetProject = projects.find((project) => project.id === projectId);
-
-    const confirmed = window.confirm(
-      `Importare la WBS da ${sourceProject?.code || "modello"} dentro ${targetProject?.code || "progetto corrente"}? Le attività esistenti NON saranno cancellate. Le date saranno vuote.`
-    );
-
-    if (!confirmed) return;
-
-    setSaving(true);
-
-    const { data: sourceRows, error: sourceError } = await supabase
-      .from("wbs_activities")
-      .select("*")
-      .eq("project_id", templateProjectId)
-      .order("sort_order", { ascending: true })
-      .order("code", { ascending: true });
-
-    if (sourceError) {
-      alert(sourceError.message);
-      setSaving(false);
-      return;
-    }
-
-    const sourceActivities = (sourceRows || []).filter((row) => row.is_group !== true);
-
-    if (sourceActivities.length === 0) {
-      alert("Il progetto modello non contiene attività WBS.");
-      setSaving(false);
-      return;
-    }
-
-    const existingCodes = new Set(
-      activities.map((activity) => String(activity.code || "").trim().toUpperCase())
-    );
-
-    const rowsToInsert = sourceActivities
-      .filter((activity) => !existingCodes.has(String(activity.code || "").trim().toUpperCase()))
-      .map((activity, index) => ({
-        ...cleanActivity(activity),
-        project_id: projectId,
-        planned_start: null,
-        planned_finish: null,
-        actual_start: null,
-        actual_finish: null,
-        sort_order: activities.length + index + 1,
-      }));
-
-    if (rowsToInsert.length === 0) {
-      alert("Nessuna attività da importare: i codici WBS sono già presenti nel progetto.");
-      setSaving(false);
-      return;
-    }
-
-    const { error: insertError } = await supabase.from("wbs_activities").insert(rowsToInsert);
-
-    if (insertError) {
-      alert(insertError.message);
-      setSaving(false);
-      return;
-    }
-
-    setSaving(false);
-    await loadWorkspace(projectId);
-    alert(`Import completato: ${rowsToInsert.length} attività aggiunte senza date.`);
-  }
 
   return (
     <main className="construction-workspace">
-      <header className="cw-workspace-header">
-        <div>
+      <header className="cw-baseline-header">
+        <div className="cw-baseline-title">
           <span>PM Planning Area</span>
           <h1>Construction Baseline</h1>
-          <p>Una riga = una lavorazione reale. Il Weight % è riferito al progetto.</p>
+          <p>
+            Pianificazione WBS del progetto. Ogni riga rappresenta una lavorazione reale.
+          </p>
         </div>
 
-        <div className="cw-project-select">
-          <label>Project</label>
+        <div className="cw-baseline-project">
+          <label htmlFor="wbs-project-select">Project</label>
           <select
+            id="wbs-project-select"
             value={projectId}
             onChange={(event) => {
               const nextProjectId = event.target.value;
@@ -410,100 +354,170 @@ export default function ConstructionWorkspace() {
         </div>
       </header>
 
-      <section className="cw-metrics">
-        <div>
-          <span>Project</span>
-          <strong>{selectedProject ? `${selectedProject.code} · ${selectedProject.name}` : "—"}</strong>
+      <section className="cw-baseline-summary">
+        <div className="cw-summary-project">
+          <span>Current baseline</span>
+          <strong>
+            {selectedProject
+              ? `${selectedProject.code} · ${selectedProject.name}`
+              : "No project selected"}
+          </strong>
         </div>
-        <div>
+
+        <div className="cw-summary-metric">
           <span>Activities</span>
           <strong>{metrics.activities}</strong>
         </div>
-        <div>
+
+        <div className="cw-summary-metric">
           <span>Total Weight</span>
           <strong className={metrics.validWeight ? "weight-good" : "weight-bad"}>
             {metrics.totalWeight}%
           </strong>
         </div>
-        <div>
+
+        <div className="cw-summary-metric">
           <span>Missing Dates</span>
           <strong>{metrics.missingDates}</strong>
         </div>
-        <div>
-          <span>Unsaved</span>
-          <strong>{dirtyIds.size}</strong>
+
+        <div className="cw-summary-save">
+          <div>
+            <span
+              className={
+                dirtyIds.size > 0
+                  ? "cw-save-status cw-save-status-dirty"
+                  : "cw-save-status cw-save-status-clean"
+              }
+            >
+              <i />
+              {dirtyIds.size > 0
+                ? `${dirtyIds.size} unsaved change${dirtyIds.size === 1 ? "" : "s"}`
+                : "All changes saved"}
+            </span>
+
+            <small>
+              {metrics.validWeight
+                ? "Baseline weight validated"
+                : "Total weight must equal 100%"}
+            </small>
+          </div>
+
+          <button
+            type="button"
+            className="cw-save-button"
+            onClick={saveAllChanges}
+            disabled={dirtyIds.size === 0 || saving}
+          >
+            {saving ? "Saving..." : "Save All"}
+          </button>
         </div>
       </section>
 
-      <section className="cw-save-bar">
-        <div>
-          <strong>{dirtyIds.size} modifiche non salvate</strong>
-          <span>
-            Weight {metrics.totalWeight}% · {metrics.validWeight ? "baseline valida" : "peso da correggere"}
-          </span>
+      <section className="cw-baseline-toolbar">
+        <div className="cw-toolbar-filters">
+          <label className="cw-search-field">
+            <span>Search</span>
+            <input
+              placeholder="Code, activity or discipline..."
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+          </label>
+
+          <label className="cw-category-field">
+            <span>Discipline</span>
+            <select
+              value={category}
+              onChange={(event) => setCategory(event.target.value)}
+            >
+              <option value="all">All disciplines</option>
+              {categories.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
 
-        <button type="button" onClick={saveAllChanges} disabled={dirtyIds.size === 0 || saving}>
-          {saving ? "Saving..." : "Save all"}
-        </button>
-      </section>
+        <div className="cw-toolbar-primary">
+          <button
+            type="button"
+            className="cw-primary-action"
+            onClick={addActivity}
+          >
+            + New Activity
+          </button>
 
-      <section className="cw-toolbar baseline-toolbar">
-        <input
-          placeholder="Search baseline activity..."
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-        />
+          <input
+            ref={excelInputRef}
+            type="file"
+            accept=".xlsx,.xls"
+            style={{ display: "none" }}
+            onChange={async (event) => {
+              const file = event.target.files?.[0];
+              event.target.value = "";
+              if (!file) return;
 
-        <select value={category} onChange={(event) => setCategory(event.target.value)}>
-          <option value="all">All categories</option>
-          {categories.map((item) => (
-            <option key={item} value={item}>
-              {item}
-            </option>
-          ))}
-        </select>
+              setImportingExcel(true);
 
-        <select
-          title="Category for new activity"
-          value={newActivityCategory}
-          onChange={(event) => setNewActivityCategory(event.target.value)}
-        >
-          {categories.map((item) => (
-            <option key={item} value={item}>
-              {item}
-            </option>
-          ))}
-        </select>
+              try {
+                const result = await importWbsExcelFile(projectId, file);
 
-        <button type="button" onClick={addActivity}>+ Activity</button>
+                if (result) {
+                  await loadWorkspace(projectId);
 
-        <select
-          title="Source WBS template"
-          value={templateProjectId}
-          onChange={(event) => setTemplateProjectId(event.target.value)}
-        >
-          <option value="">Select WBS model</option>
-          {projects
-            .filter((project) => project.id !== projectId)
-            .map((project) => (
-              <option key={project.id} value={project.id}>
-                Model: {project.code} · {project.name}
-              </option>
-            ))}
-        </select>
+                  window.alert(
+                    `Import completato: ${result.activitiesCount} attività. ` +
+                      `Peso totale: ${result.totalWeight.toFixed(2)}%.`
+                  );
+                }
+              } catch (err) {
+                window.alert(err.message || "Errore import Excel WBS");
+              } finally {
+                setImportingExcel(false);
+              }
+            }}
+          />
 
-        <button type="button" className="cw-secondary-action" onClick={importTemplateIntoCurrentProject}>
-          Import WBS into this project
-        </button>
+          <button
+            type="button"
+            className="cw-secondary-action"
+            onClick={() => excelInputRef.current?.click()}
+            disabled={importingExcel}
+          >
+            {importingExcel ? "Reading Excel..." : "Import Excel"}
+          </button>
 
-        <button type="button" className="cw-danger-action" onClick={deleteSelectedActivities} disabled={selectedIds.size === 0}>
-          Delete selected ({selectedIds.size})
-        </button>
+          <button
+            type="button"
+            className="cw-secondary-action"
+            onClick={downloadWbsTemplate}
+          >
+            Download Template
+          </button>
+        </div>
 
-        <button type="button" className="cw-danger-action" onClick={deleteAllActivities}>
-          Delete all WBS
-        </button>
+        <div className="cw-toolbar-danger">
+          <button
+            type="button"
+            className="cw-danger-action"
+            onClick={deleteSelectedActivities}
+            disabled={selectedIds.size === 0}
+          >
+            Delete Selected
+            {selectedIds.size > 0 ? ` (${selectedIds.size})` : ""}
+          </button>
+
+          <button
+            type="button"
+            className="cw-danger-action cw-danger-action-strong"
+            onClick={deleteAllActivities}
+          >
+            Delete All WBS
+          </button>
+        </div>
       </section>
 
       <section className="cw-grid-shell excel-shell">
@@ -521,11 +535,11 @@ export default function ConstructionWorkspace() {
                   />
                 </th>
                 <th>Code</th>
-                <th>Category</th>
                 <th>Activity</th>
+                <th>Category</th>
                 <th>U.M.</th>
-                <th>Baseline Qty</th>
-                <th>Weight %</th>
+                <th>Qty</th>
+                <th>Weight</th>
                 <th>Planned Start</th>
                 <th>Planned Finish</th>
                 <th>Status</th>
@@ -549,6 +563,12 @@ export default function ConstructionWorkspace() {
                       onChange={(event) => updateActivity(activity.id, "code", event.target.value)}
                     />
                   </td>
+                  <td className="baseline-activity-cell">
+                    <input
+                      value={activity.name || ""}
+                      onChange={(event) => updateActivity(activity.id, "name", event.target.value)}
+                    />
+                  </td>
                   <td>
                     <select
                       value={activity.discipline || "GENERAL"}
@@ -558,12 +578,6 @@ export default function ConstructionWorkspace() {
                         <option key={item} value={item}>{item}</option>
                       ))}
                     </select>
-                  </td>
-                  <td className="baseline-activity-cell">
-                    <input
-                      value={activity.name || ""}
-                      onChange={(event) => updateActivity(activity.id, "name", event.target.value)}
-                    />
                   </td>
                   <td>
                     <input

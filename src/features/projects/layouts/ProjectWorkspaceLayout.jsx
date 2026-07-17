@@ -1,17 +1,20 @@
 import { NavLink, Outlet, Link } from "react-router-dom";
 import { ProjectProvider } from "../context/ProjectContext";
 import { useProject } from "../context/useProject";
+import "../../../styles/project-workspace.css";
 
 const workspaceTabs = [
   { label: "Control Room", path: "dashboard" },
   { label: "WBS Planning", path: "wbs" },
   { label: "Weekly Production", path: "weekly" },
+  { label: "Recovery", path: "forecast" },
+  { label: "Cash Flow", path: "cash-flow" },
+  { label: "Executive Notes", path: "executive-notes" },
   { label: "Documents", path: "documents" },
 ];
 
 function ProjectWorkspaceShell() {
   const { currentProject, projectLoading, projectError } = useProject();
-
   if (projectLoading) {
     return (
       <main className="workspace-state">
@@ -47,6 +50,7 @@ function ProjectWorkspaceShell() {
 
           <h1>{currentProject?.name}</h1>
         </div>
+
       </header>
 
       <nav

@@ -1,27 +1,95 @@
+import { lazy, Suspense } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
-import Portfolio from "../pages/Portfolio";
-import ProjectWorkspaceLayout from "../features/projects/layouts/ProjectWorkspaceLayout";
 
-import ProjectDashboard from "../pages/project-workspace/ProjectDashboard";
-import ConstructionWorkspace from "../pages/project-workspace/ConstructionWorkspace";
-import ProjectWeekly from "../pages/project-workspace/ProjectWeekly";
-import ProjectDocuments from "../pages/project-workspace/ProjectDocuments";
-import ProjectIssues from "../pages/project-workspace/ProjectIssues";
-import ProjectCommissioning from "../pages/project-workspace/ProjectCommissioning";
-import ProjectAnalytics from "../pages/project-workspace/ProjectAnalytics";
-import ProjectSettings from "../pages/project-workspace/ProjectSettings";
+import { LoginPage, ProtectedRoute } from "../features/auth";
+
+const Portfolio = lazy(() => import("../pages/Portfolio"));
+const ProjectWorkspaceLayout = lazy(() =>
+  import("../features/projects/layouts/ProjectWorkspaceLayout")
+);
+const ProjectDashboard = lazy(() =>
+  import("../pages/project-workspace/ProjectDashboard")
+);
+const ConstructionWorkspace = lazy(() =>
+  import("../pages/project-workspace/ConstructionWorkspace")
+);
+const ProjectWeekly = lazy(() =>
+  import("../pages/project-workspace/ProjectWeekly")
+);
+const ProjectCashFlow = lazy(() =>
+  import("../pages/project-workspace/ProjectCashFlow")
+);
+const ProjectForecast = lazy(() =>
+  import("../pages/project-workspace/ProjectForecast")
+);
+const ProjectExecutiveNotes = lazy(() =>
+  import("../pages/project-workspace/ProjectExecutiveNotes")
+);
+const ProjectDocuments = lazy(() =>
+  import("../pages/project-workspace/ProjectDocuments")
+);
+const ProjectIssues = lazy(() =>
+  import("../pages/project-workspace/ProjectIssues")
+);
+const ProjectCommissioning = lazy(() =>
+  import("../pages/project-workspace/ProjectCommissioning")
+);
+const ProjectAnalytics = lazy(() =>
+  import("../pages/project-workspace/ProjectAnalytics")
+);
+const ProjectSettings = lazy(() =>
+  import("../pages/project-workspace/ProjectSettings")
+);
+
+function RouteLoader() {
+  return (
+    <main className="route-loader">
+      <div>
+        <span className="eyebrow">HELIOS CM Enterprise</span>
+        <p>Loading workspace...</p>
+      </div>
+    </main>
+  );
+}
+
+function ProtectedPage({ children }) {
+  return (
+    <ProtectedRoute>
+      <Suspense fallback={<RouteLoader />}>{children}</Suspense>
+    </ProtectedRoute>
+  );
+}
 
 export default function AppRoutes() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Portfolio />} />
+        <Route path="/login" element={<LoginPage />} />
 
-        <Route path="/projects/:projectId" element={<ProjectWorkspaceLayout />}>
+        <Route
+          path="/"
+          element={
+            <ProtectedPage>
+              <Portfolio />
+            </ProtectedPage>
+          }
+        />
+
+        <Route
+          path="/projects/:projectId"
+          element={
+            <ProtectedPage>
+              <ProjectWorkspaceLayout />
+            </ProtectedPage>
+          }
+        >
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<ProjectDashboard />} />
           <Route path="wbs" element={<ConstructionWorkspace />} />
           <Route path="weekly" element={<ProjectWeekly />} />
+          <Route path="forecast" element={<ProjectForecast />} />
+          <Route path="cash-flow" element={<ProjectCashFlow />} />
+          <Route path="executive-notes" element={<ProjectExecutiveNotes />} />
           <Route path="documents" element={<ProjectDocuments />} />
           <Route path="issues" element={<ProjectIssues />} />
           <Route path="commissioning" element={<ProjectCommissioning />} />

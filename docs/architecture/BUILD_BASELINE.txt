@@ -1,0 +1,38 @@
+
+> helios-lite@0.1.0 build
+> vite build
+
+vite v8.1.3 building client environment for production...
+[2Ktransforming...✓ 691 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                       0.54 kB │ gzip:   0.33 kB
+dist/assets/ProjectWorkspaceLayout-BpujAsY0.css       1.97 kB │ gzip:   0.73 kB
+dist/assets/index-DuyC-a8w.css                        2.54 kB │ gzip:   1.01 kB
+dist/assets/ProjectExecutiveNotes-CFdWlJL6.css        5.93 kB │ gzip:   1.48 kB
+dist/assets/ProjectForecast-9PW5JNYK.css              6.27 kB │ gzip:   1.82 kB
+dist/assets/Portfolio-x7GIDM7b.css                    6.80 kB │ gzip:   1.79 kB
+dist/assets/ProjectDashboard-MQj8HRbW.css             8.07 kB │ gzip:   2.09 kB
+dist/assets/construction-workspace-Dp1BYjAF.css      15.06 kB │ gzip:   3.22 kB
+dist/assets/__vite-browser-external-8Lh2pky1.js       0.10 kB │ gzip:   0.11 kB
+dist/assets/useProject-BdPq2m6h.js                    0.27 kB │ gzip:   0.21 kB
+dist/assets/ProjectCommissioning-DRbRsfbH.js          0.45 kB │ gzip:   0.29 kB
+dist/assets/ProjectIssues-0gAPRmOD.js                 0.47 kB │ gzip:   0.31 kB
+dist/assets/ProjectDocuments-q3q1LtAv.js              0.47 kB │ gzip:   0.31 kB
+dist/assets/ProjectSettings-DornRfX4.js               0.48 kB │ gzip:   0.31 kB
+dist/assets/ProjectAnalytics-B8gM9EOW.js              0.49 kB │ gzip:   0.32 kB
+dist/assets/rolldown-runtime-aKtaBQYM.js              1.08 kB │ gzip:   0.62 kB
+dist/assets/executiveNotesService-DOMZcC3g.js         2.21 kB │ gzip:   0.81 kB
+dist/assets/ProjectWorkspaceLayout-BHtRb5Nm.js        2.56 kB │ gzip:   1.12 kB
+dist/assets/recoveryForecastService-BIGcsP1B.js       3.83 kB │ gzip:   1.08 kB
+dist/assets/ProjectExecutiveNotes-BenPMU8Z.js         7.47 kB │ gzip:   2.43 kB
+dist/assets/ProjectWeekly-CPaSh9W9.js                12.97 kB │ gzip:   4.53 kB
+dist/assets/constructionEngine.service-C-uvoIxL.js   16.66 kB │ gzip:   5.23 kB
+dist/assets/ConstructionWorkspace-CxBQR1qO.js        17.91 kB │ gzip:   5.69 kB
+dist/assets/ProjectForecast-CRx6cFfR.js              19.13 kB │ gzip:   5.74 kB
+dist/assets/ProjectDashboard-C2dx8yfx.js            378.41 kB │ gzip: 108.48 kB
+dist/assets/Portfolio-S-FvOjBm.js                   395.22 kB │ gzip: 131.39 kB
+dist/assets/xlsx-Z0cIKGHL.js                        421.57 kB │ gzip: 140.62 kB
+dist/assets/index-C_YKXySg.js                       442.19 kB │ gzip: 127.82 kB
+
+✓ built in 200ms

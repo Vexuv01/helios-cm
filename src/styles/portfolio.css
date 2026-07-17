@@ -28,7 +28,7 @@
 .portfolio-hero p,
 .project-form-panel p {
   margin: 0;
-  max-width: 720px;
+  max-width: 760px;
   color: var(--muted);
   line-height: 1.6;
 }
@@ -79,6 +79,10 @@
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 16px;
+}
+
+.executive-kpi-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .kpi-card {
@@ -171,7 +175,7 @@
 }
 
 .section-heading p {
-  margin: 0;
+  margin: 6px 0 0;
   color: var(--muted);
 }
 
@@ -186,6 +190,20 @@
   padding: 22px;
   background: rgba(255, 255, 255, 0.035);
   border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.project-card-clickable {
+  cursor: pointer;
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    background 160ms ease;
+}
+
+.project-card-clickable:hover {
+  transform: translateY(-2px);
+  border-color: rgba(99, 102, 241, 0.42);
+  background: rgba(255, 255, 255, 0.055);
 }
 
 .project-card-header {
@@ -216,19 +234,62 @@
   color: var(--muted);
 }
 
-.project-data-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+.executive-progress {
   margin-top: 18px;
+  padding: 16px;
+  border-radius: 20px;
+  background: rgba(0, 0, 0, 0.18);
 }
 
+.progress-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.progress-head span,
+.executive-progress small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.progress-head strong {
+  font-size: 22px;
+}
+
+.progress-track {
+  height: 10px;
+  margin: 12px 0 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.18);
+}
+
+.progress-track div {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(135deg, #22c55e, #06b6d4);
+}
+
+.project-executive-grid,
+.project-data-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.project-executive-grid div,
 .project-data-grid div {
   padding: 14px;
   border-radius: 18px;
   background: rgba(0, 0, 0, 0.18);
 }
 
+.project-executive-grid span,
 .project-data-grid span {
   display: block;
   color: var(--muted);
@@ -238,6 +299,7 @@
   letter-spacing: 0.08em;
 }
 
+.project-executive-grid strong,
 .project-data-grid strong {
   display: block;
   margin-top: 6px;
@@ -251,6 +313,8 @@
   flex-wrap: wrap;
 }
 
+.risk-badge,
+.weekly-pill,
 .status-pill,
 .priority-pill {
   display: inline-flex;
@@ -259,6 +323,36 @@
   font-size: 11px;
   font-weight: 900;
   text-transform: uppercase;
+}
+
+.risk-HIGH {
+  background: rgba(239, 68, 68, 0.14);
+  color: #fecaca;
+}
+
+.risk-MEDIUM {
+  background: rgba(245, 158, 11, 0.14);
+  color: #fde68a;
+}
+
+.risk-LOW {
+  background: rgba(34, 197, 94, 0.14);
+  color: #86efac;
+}
+
+.risk-NO_DATA {
+  background: rgba(148, 163, 184, 0.14);
+  color: #cbd5e1;
+}
+
+.weekly-pill.ok {
+  background: rgba(34, 197, 94, 0.12);
+  color: #86efac;
+}
+
+.weekly-pill.missing {
+  background: rgba(248, 113, 113, 0.12);
+  color: #fecaca;
 }
 
 .status-pill {
@@ -287,13 +381,45 @@
   font-weight: 800;
 }
 
+.project-actions button:hover {
+  background: rgba(255, 255, 255, 0.13);
+}
+
+.project-decision {
+  margin-top: 16px;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(15, 23, 42, 0.28);
+}
+
+.project-decision span {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.project-decision p {
+  margin: 6px 0 0;
+  color: rgba(226, 232, 240, 0.86);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 @media (max-width: 1180px) {
   .kpi-grid,
+  .executive-kpi-grid,
   .projects-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .portfolio-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .project-executive-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -305,12 +431,14 @@
 
   .filters-bar,
   .kpi-grid,
+  .executive-kpi-grid,
   .projects-grid,
   .portfolio-form {
     grid-template-columns: 1fr;
   }
 
-  .project-data-grid {
+  .project-data-grid,
+  .project-executive-grid {
     grid-template-columns: 1fr;
   }
 
@@ -319,3 +447,79 @@
     margin-left: 0;
   }
 }
+
+/* Portfolio hero — definitive layout */
+.portfolio-page {
+  padding-top: 5.75rem;
+}
+
+.portfolio-hero {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 2rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.portfolio-hero > div:first-child {
+  min-width: 0;
+}
+
+.portfolio-hero-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.85rem;
+  flex-wrap: wrap;
+  position: static;
+  z-index: 2;
+}
+
+.portfolio-hero-actions .secondary-button,
+.portfolio-hero-actions .new-project-button {
+  min-height: 44px;
+  padding: 0.8rem 1.15rem;
+  white-space: nowrap;
+}
+
+.portfolio-hero-actions .secondary-button {
+  color: #e0f2fe;
+  border: 1px solid rgba(56, 189, 248, 0.55);
+  background: rgba(14, 165, 233, 0.14);
+}
+
+.portfolio-hero-actions .secondary-button:hover {
+  border-color: #38bdf8;
+  background: rgba(14, 165, 233, 0.24);
+}
+
+@media (max-width: 980px) {
+  .portfolio-hero {
+    grid-template-columns: 1fr;
+    align-items: flex-start;
+  }
+
+  .portfolio-hero-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 600px) {
+  .portfolio-page {
+    padding-top: 6.5rem;
+  }
+
+  .portfolio-hero-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .portfolio-hero-actions .secondary-button,
+  .portfolio-hero-actions .new-project-button {
+    width: 100%;
+  }
+}
+
