@@ -3,6 +3,7 @@ import { detectImportMode } from "../domain/detectImportMode.js";
 import { buildImportPlan } from "../domain/buildImportPlan.js";
 import { buildExecutionPipeline } from "../domain/buildExecutionPipeline.js";
 import { analyzeWorkbook } from "../analysis/workbookAnalysis.js";
+import { executePipeline } from "./executePipeline.js";
 import { parseWbsExcelFile } from "../../wbs/import/excelParser.js";
 
 export async function syncProject({
@@ -29,11 +30,14 @@ export async function syncProject({
 
   const pipeline = buildExecutionPipeline(plan);
 
+  const execution = await executePipeline(pipeline);
+
   return {
     mode,
     summary,
     plan,
     pipeline,
+    execution,
     workbook: parsedWorkbook.workbook,
     wbsActivities,
   };
