@@ -5,8 +5,10 @@ import { buildExecutionPipeline } from "../domain/buildExecutionPipeline.js";
 import { analyzeWorkbook } from "../analysis/workbookAnalysis.js";
 import { executePipeline } from "./executePipeline.js";
 import { parseWbsExcelFile } from "../../wbs/import/excelParser.js";
+import { executeWbsImport } from "../../wbs/services/wbsImportService.js";
 
 export async function syncProject({
+  projectId,
   file,
   activitiesCount = 0,
   reportsCount = 0,
@@ -30,7 +32,12 @@ export async function syncProject({
 
   const pipeline = buildExecutionPipeline(plan);
 
-  const execution = await executePipeline(pipeline);
+  const execution = await executePipeline(
+    pipeline,
+    {
+      baseline: () => executeWbsImport(projectId, wbsActivities),
+    }
+  );
 
   return {
     mode,

@@ -51,7 +51,7 @@ function ProjectWorkspaceShell() {
 
           <h1>{currentProject?.name}</h1>
 
-          <ProjectSyncBar />
+          <ProjectSyncBar projectId={currentProject?.id} />
         </div>
 
       </header>

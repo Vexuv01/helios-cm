@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { syncProject } from "../services/projectImportService";
 
-export default function ProjectSyncBar() {
+export default function ProjectSyncBar({ projectId }) {
   const inputRef = useRef(null);
 
   const [loading, setLoading] = useState(false);
@@ -15,6 +15,7 @@ export default function ProjectSyncBar() {
 
     try {
       const data = await syncProject({
+        projectId,
         file,
         activitiesCount: 0,
         reportsCount: 0,
